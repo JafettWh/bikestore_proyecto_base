@@ -1,9 +1,10 @@
 node_modules/
 dist/
+.vite/
 .env
-.env.local
-.env.development
-.env.production
-.env.*.local
-
-**/package-lock.json
+.env.*
+package-lock.json/
+!.env.example
+*.log
+*.tsbuildinfo
+vite.config.*.timestamp-*

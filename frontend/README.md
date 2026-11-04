@@ -1,52 +1,69 @@
-# LAB CRUD - Frontend
+# BikeStore – Frontend
 
-React + Vite parra consumir el backend del laboratorio.
+Tienda virtual de bicicletas deportivas y accesorios. React 19 + Vite + Tailwind CSS 4.
 
-## Requisitos
+## Estructura
 
-- Node.js 20+
-- Backend ejecutándose en `http://localhost:3000`
-- Base de datos `lab_crud`
+```
+Frontend/
+├── public/assets/        Imágenes (logo y productos). Se copian tal cual a dist/
+├── src/
+│   ├── assets/styles.css Todos los estilos: globales y los de cada componente/página
+│   ├── components/       Componentes reutilizables (Header, Footer, ProductCard, modales, Button...)
+│   ├── config/env.js     Variables de entorno y helper asset() para rutas de imágenes
+│   ├── context/          AuthContext y CartContext (estado global)
+│   ├── data/             Catálogo y datos de ejemplo
+│   ├── hooks/            useAuth y useCart
+│   ├── pages/            Vistas: Home, detalle, carrito, checkout, éxito, acceso, administración
+│   ├── utils/            Formateo de moneda y exportación a Excel/PDF
+│   ├── App.jsx
+│   └── main.jsx
+├── .env.example
+├── index.html
+├── package.json
+└── vite.config.js
+```
 
-## Instalar
+## Ejecutar en desarrollo
+
+Requiere Node.js 20.19 o superior.
 
 ```bash
+cd Frontend
+cp .env.example .env     # en Windows: copy .env.example .env
 npm install
+npm run dev              # http://localhost:5173
 ```
 
-## Ejecutar
+En Windows también puedes hacer doble clic en `iniciar.bat` (en la raíz del proyecto).
+
+## Publicar en cualquier servidor
 
 ```bash
-npm run dev
+npm run build
 ```
 
-Frontend: `http://localhost:5173`
+Se genera la carpeta `dist/` con HTML, CSS y JS estáticos. Sube su contenido a cualquier
+servidor web (Apache/XAMPP, Nginx, IIS, hosting compartido, Netlify, GitHub Pages...).
+Funciona en la raíz del dominio o dentro de una subcarpeta (`https://sitio.com/bikestore/`)
+porque `vite.config.js` usa `base: "./"` y las imágenes se resuelven con `asset()`.
+La navegación es interna (sin rutas en la URL), por lo que no necesita reglas de reescritura.
 
-## Usuarios de prueba
+Para probar el resultado compilado en local: `npm run preview` (http://localhost:4173).
 
-Admin:
+## Notas del prototipo
 
-- `admin@labcrud.local`
-- `Password123!`
+- Los datos (usuarios, catálogo, carrito, pedidos) se guardan en `localStorage`; no hay backend aún.
+- El inicio de sesión es simulado: acepta cualquier contraseña. Usuarios de ejemplo: `a.silva@bikestore.com` y
+  `jafet.h@bikestore.com` (administradores), `beatriz.m@gmail.com` (cliente).
+- La vista de administración está protegida con `ProtectedRoute` y solo abre para el rol `admin`.
+- Las fuentes (Inter y Barlow Condensed) se cargan desde Google Fonts; sin internet se usa una fuente del sistema.
 
-Cliente
+## Estilos
 
-- `cliente@labcrud.local`
-- `Password123!`
-
-## Responsabilidades
-
-- `assets`: estilos y recursos.
-- `components`: componentes reutilizables.
-- `config`: configuración del frontend.
-- `context`: estado global de autenticación.
-- `hooks`: hooks propios.
-- `pages`: pantallas.
-- `services`: comunicación con la API.
-- `utils`: almacenamiento de sesión.
-
-## Flujo
-
-Login → AuthContext → JWT en localStorage → `api.js` agrega Bearer token → backend verifica JWT → autorización por rol.
-
-El botón Eliminar solo aparece para `admin`, pero el backend también verifica el rol. Ocultar un botón en React no constituye seguridad.
+Todo el CSS vive en `src/assets/styles.css`, y cada componente y página lo importa
+(`import "../assets/styles.css"`). Cada elemento tiene su propia clase (por ejemplo
+`product-card-button-3`, `header-nav-1`) definida en la sección "Estilos de componentes y páginas",
+agrupada por archivo. Las reglas usan `@apply` de Tailwind 4, así que para cambiar un color, tamaño o
+espaciado se edita esa clase en `styles.css`, no el JSX. Los antiguos `style={{ }}` en línea están
+al final del archivo.
