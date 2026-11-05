@@ -4,15 +4,15 @@ CREATE DATABASE IF NOT EXISTS bikestore
 USE bikestore;
 
 CREATE TABLE IF NOT EXISTS roles (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name ENUM('admin', 'cliente') NOT NULL UNIQUE,
+  id_rol INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  nombre_rol ENUM('admin', 'cliente') NOT NULL UNIQUE,
   crud_create BOOLEAN NOT NULL DEFAULT FALSE,
   crud_read BOOLEAN NOT NULL DEFAULT TRUE,
   crud_update BOOLEAN NOT NULL DEFAULT FALSE,
   crud_delete BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-INSERT INTO roles (name, crud_create, crud_read, crud_update, crud_delete)
+INSERT INTO roles (nombre_rol, crud_create, crud_read, crud_update, crud_delete)
 VALUES
   ('admin', TRUE, TRUE, TRUE, TRUE),
   ('cliente', FALSE, TRUE, FALSE, FALSE)
@@ -23,47 +23,47 @@ ON DUPLICATE KEY UPDATE
   crud_delete = VALUES(crud_delete);
 
 CREATE TABLE IF NOT EXISTS users (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  role_id INT UNSIGNED NOT NULL,
-  name VARCHAR(120) NOT NULL,
-  email VARCHAR(254) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
-  phone VARCHAR(32) NULL,
-  address VARCHAR(255) NULL,
-  neighborhood VARCHAR(120) NULL,
-  city VARCHAR(100) NULL,
-  department VARCHAR(100) NULL,
+  id_usuario BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_rol INT UNSIGNED NOT NULL,
+  nombre_usuario VARCHAR(120) NOT NULL,
+  correo_usuario VARCHAR(254) NOT NULL UNIQUE,
+  `contraseña_hash` VARCHAR(255) NOT NULL,
+  telefono_usuario VARCHAR(32) NULL,
+  direccion_detallada VARCHAR(255) NULL,
+  barrio VARCHAR(120) NULL,
+  ciudad VARCHAR(100) NULL,
+  departamento VARCHAR(100) NULL,
   terms_accepted_at DATETIME NULL,
-  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  estado_usuario ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(id),
-  INDEX idx_users_status_role (status, role_id)
+  CONSTRAINT fk_users_role FOREIGN KEY (id_rol) REFERENCES roles(id_rol),
+  INDEX idx_users_status_role (estado_usuario, id_rol)
 );
 
 CREATE TABLE IF NOT EXISTS sections (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(60) NOT NULL UNIQUE
+  id_seccion INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  nombre_seccion VARCHAR(60) NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS categories (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  section_id INT UNSIGNED NOT NULL,
-  name VARCHAR(80) NOT NULL,
-  UNIQUE KEY uq_category_section_name (section_id, name),
-  UNIQUE KEY uq_categories_id_section (id, section_id),
-  CONSTRAINT fk_categories_section FOREIGN KEY (section_id) REFERENCES sections(id)
+  id_categoria INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_seccion INT UNSIGNED NOT NULL,
+  nombre_categoria VARCHAR(80) NOT NULL,
+  UNIQUE KEY uq_category_section_name (id_seccion, nombre_categoria),
+  UNIQUE KEY uq_categories_id_section (id_categoria, id_seccion),
+  CONSTRAINT fk_categories_section FOREIGN KEY (id_seccion) REFERENCES sections(id_seccion)
 );
 
-INSERT INTO sections (name)
+INSERT INTO sections (nombre_seccion)
 VALUES ('Bicicletas'), ('Componentes'), ('Accesorios')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON DUPLICATE KEY UPDATE nombre_seccion = VALUES(nombre_seccion);
 
-INSERT INTO categories (section_id, name)
-SELECT s.id, c.name
+INSERT INTO categories (id_seccion, nombre_categoria)
+SELECT s.id_seccion, c.nombre_categoria
 FROM sections s
 JOIN (
-  SELECT 'Bicicletas' AS section_name, 'Montaña' AS name UNION ALL
+  SELECT 'Bicicletas' AS section_name, 'Montaña' AS nombre_categoria UNION ALL
   SELECT 'Bicicletas', 'Carretera / Ruta' UNION ALL
   SELECT 'Bicicletas', 'Carretera / Endurance' UNION ALL
   SELECT 'Bicicletas', 'Gravel' UNION ALL
@@ -80,123 +80,123 @@ JOIN (
   SELECT 'Accesorios', 'Tecnología' UNION ALL
   SELECT 'Accesorios', 'Herramientas' UNION ALL
   SELECT 'Accesorios', 'Sensores'
-) c ON c.section_name = s.name
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+) c ON c.section_name = s.nombre_seccion
+ON DUPLICATE KEY UPDATE nombre_categoria = VALUES(nombre_categoria);
 
 CREATE TABLE IF NOT EXISTS products (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  section_id INT UNSIGNED NOT NULL,
-  category_id INT UNSIGNED NOT NULL,
-  name VARCHAR(160) NOT NULL,
-  description TEXT NOT NULL,
-  technical_specs JSON NULL,
-  price DECIMAL(12, 2) NOT NULL,
+  id_producto BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_seccion INT UNSIGNED NOT NULL,
+  id_categoria INT UNSIGNED NOT NULL,
+  nombre_producto VARCHAR(160) NOT NULL,
+  descripcion_general TEXT NOT NULL,
+  especificaciones_tecnicas JSON NULL,
+  precio_producto DECIMAL(12, 2) NOT NULL,
   stock INT UNSIGNED NOT NULL DEFAULT 0,
-  image_url VARCHAR(500) NULL,
+  imagen_producto VARCHAR(500) NULL,
   badge VARCHAR(40) NULL,
-  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
-  inactivation_reason VARCHAR(500) NULL,
+  estado_producto ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  motivo_inactivacion VARCHAR(500) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_products_section FOREIGN KEY (section_id) REFERENCES sections(id),
-  CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES categories(id),
+  CONSTRAINT fk_products_section FOREIGN KEY (id_seccion) REFERENCES sections(id_seccion),
+  CONSTRAINT fk_products_category FOREIGN KEY (id_categoria) REFERENCES categories(id_categoria),
   CONSTRAINT fk_products_category_section
-    FOREIGN KEY (category_id, section_id) REFERENCES categories(id, section_id),
-  CONSTRAINT chk_products_price CHECK (price > 0),
+    FOREIGN KEY (id_categoria, id_seccion) REFERENCES categories(id_categoria, id_seccion),
+  CONSTRAINT chk_products_price CHECK (precio_producto > 0),
   CONSTRAINT chk_products_stock CHECK (stock >= 0),
-  INDEX idx_products_status_category (status, category_id),
-  FULLTEXT INDEX idx_products_search (name, description)
+  INDEX idx_products_status_category (estado_producto, id_categoria),
+  FULLTEXT INDEX idx_products_search (nombre_producto, descripcion_general)
 );
 
 CREATE TABLE IF NOT EXISTS product_images (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  product_id BIGINT UNSIGNED NOT NULL,
-  image_url VARCHAR(500) NOT NULL,
+  id_imagen BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_producto BIGINT UNSIGNED NOT NULL,
+  url_imagen VARCHAR(500) NOT NULL,
   position SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-  CONSTRAINT fk_product_images_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+  CONSTRAINT fk_product_images_product FOREIGN KEY (id_producto) REFERENCES products(id_producto) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS product_sizes (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  product_id BIGINT UNSIGNED NOT NULL,
-  name VARCHAR(40) NOT NULL,
-  UNIQUE KEY uq_product_size (product_id, name),
-  CONSTRAINT fk_product_sizes_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+  id_talla BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_producto BIGINT UNSIGNED NOT NULL,
+  nombre_talla VARCHAR(40) NOT NULL,
+  UNIQUE KEY uq_product_size (id_producto, nombre_talla),
+  CONSTRAINT fk_product_sizes_product FOREIGN KEY (id_producto) REFERENCES products(id_producto) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS carts (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT UNSIGNED NULL UNIQUE,
+  id_usuario BIGINT UNSIGNED NULL UNIQUE,
   guest_key CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL UNIQUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_carts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_carts_user FOREIGN KEY (id_usuario) REFERENCES users(id_usuario) ON DELETE CASCADE,
   CONSTRAINT chk_cart_owner CHECK (
-    (user_id IS NOT NULL AND guest_key IS NULL) OR
-    (user_id IS NULL AND guest_key IS NOT NULL)
+    (id_usuario IS NOT NULL AND guest_key IS NULL) OR
+    (id_usuario IS NULL AND guest_key IS NOT NULL)
   )
 );
 
 CREATE TABLE IF NOT EXISTS cart_items (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   cart_id BIGINT UNSIGNED NOT NULL,
-  product_id BIGINT UNSIGNED NOT NULL,
+  id_producto BIGINT UNSIGNED NOT NULL,
   selected_size VARCHAR(40) NOT NULL DEFAULT '',
   quantity INT UNSIGNED NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_cart_product_size (cart_id, product_id, selected_size),
+  UNIQUE KEY uq_cart_product_size (cart_id, id_producto, selected_size),
   CONSTRAINT fk_cart_items_cart FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE,
-  CONSTRAINT fk_cart_items_product FOREIGN KEY (product_id) REFERENCES products(id),
+  CONSTRAINT fk_cart_items_product FOREIGN KEY (id_producto) REFERENCES products(id_producto),
   CONSTRAINT chk_cart_item_quantity CHECK (quantity > 0)
 );
 
 CREATE TABLE IF NOT EXISTS orders (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_pedido BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_number VARCHAR(32) NOT NULL UNIQUE,
-  user_id BIGINT UNSIGNED NOT NULL,
-  status ENUM('paid', 'cancelled') NOT NULL DEFAULT 'paid',
+  id_usuario BIGINT UNSIGNED NOT NULL,
+  estado_pedido ENUM('paid', 'cancelled') NOT NULL DEFAULT 'paid',
   subtotal DECIMAL(12, 2) NOT NULL,
   shipping DECIMAL(12, 2) NOT NULL DEFAULT 0,
   total DECIMAL(12, 2) NOT NULL,
-  recipient_name VARCHAR(120) NOT NULL,
-  recipient_email VARCHAR(254) NOT NULL,
-  recipient_phone VARCHAR(32) NOT NULL,
-  address VARCHAR(255) NOT NULL,
-  neighborhood VARCHAR(120) NULL,
-  city VARCHAR(100) NOT NULL,
-  department VARCHAR(100) NOT NULL,
-  payment_method ENUM('card', 'pse') NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(id),
-  INDEX idx_orders_date_status (created_at, status),
-  INDEX idx_orders_user_date (user_id, created_at)
+  nombre_destinatario VARCHAR(120) NOT NULL,
+  correo_destinatario VARCHAR(254) NOT NULL,
+  telefono_destinatario VARCHAR(32) NOT NULL,
+  dp_direccion_detallada VARCHAR(255) NOT NULL,
+  dp_barrio VARCHAR(120) NULL,
+  dp_ciudad VARCHAR(100) NOT NULL,
+  dp_departamento VARCHAR(100) NOT NULL,
+  metodo_pago ENUM('card', 'pse') NOT NULL,
+  fecha_pedido TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_orders_user FOREIGN KEY (id_usuario) REFERENCES users(id_usuario),
+  INDEX idx_orders_date_status (fecha_pedido, estado_pedido),
+  INDEX idx_orders_user_date (id_usuario, fecha_pedido)
 );
 
 CREATE TABLE IF NOT EXISTS order_items (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  order_id BIGINT UNSIGNED NOT NULL,
-  product_id BIGINT UNSIGNED NOT NULL,
-  product_name VARCHAR(160) NOT NULL,
-  quantity INT UNSIGNED NOT NULL,
-  unit_price DECIMAL(12, 2) NOT NULL,
+  id_detalle_pedido BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_pedido BIGINT UNSIGNED NOT NULL,
+  id_producto BIGINT UNSIGNED NOT NULL,
+  nombre_producto VARCHAR(160) NOT NULL,
+  cantidad INT UNSIGNED NOT NULL,
+  precio_unitario DECIMAL(12, 2) NOT NULL,
   selected_size VARCHAR(40) NULL,
-  CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-  CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products(id),
-  CONSTRAINT chk_order_item_quantity CHECK (quantity > 0),
-  INDEX idx_order_items_product (product_id)
+  CONSTRAINT fk_order_items_order FOREIGN KEY (id_pedido) REFERENCES orders(id_pedido) ON DELETE CASCADE,
+  CONSTRAINT fk_order_items_product FOREIGN KEY (id_producto) REFERENCES products(id_producto),
+  CONSTRAINT chk_order_item_quantity CHECK (cantidad > 0),
+  INDEX idx_order_items_product (id_producto)
 );
 
 CREATE TABLE IF NOT EXISTS payments (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  order_id BIGINT UNSIGNED NOT NULL UNIQUE,
-  amount DECIMAL(12, 2) NOT NULL,
-  method ENUM('card', 'pse') NOT NULL,
-  status ENUM('approved', 'rejected') NOT NULL,
-  bank_name VARCHAR(100) NULL,
+  id_pago BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_pedido BIGINT UNSIGNED NOT NULL UNIQUE,
+  valor_pago DECIMAL(12, 2) NOT NULL,
+  metodo_pago ENUM('card', 'pse') NOT NULL,
+  estado_pago ENUM('approved', 'rejected') NOT NULL,
+  banco_origen VARCHAR(100) NULL,
   is_simulated BOOLEAN NOT NULL DEFAULT TRUE,
-  paid_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders(id)
+  fecha_pago TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_payments_order FOREIGN KEY (id_pedido) REFERENCES orders(id_pedido)
 );
 
 CREATE TABLE IF NOT EXISTS password_reset_codes (
@@ -208,12 +208,12 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
   verified_at DATETIME NULL,
   used_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_reset_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_reset_codes_user FOREIGN KEY (user_id) REFERENCES users(id_usuario) ON DELETE CASCADE,
   INDEX idx_reset_user_expiry (user_id, expires_at)
 );
 
-INSERT INTO products (section_id, category_id, name, description, technical_specs, price, stock, image_url, badge)
-SELECT s.id, c.id, seed.name, seed.description, seed.specs, seed.price, seed.stock, seed.image, seed.badge
+INSERT INTO products (id_seccion, id_categoria, nombre_producto, descripcion_general, especificaciones_tecnicas, precio_producto, stock, imagen_producto, badge)
+SELECT s.id_seccion, c.id_categoria, seed.name, seed.description, seed.specs, seed.price, seed.stock, seed.image, seed.badge
 FROM (
   SELECT 'Bicicletas' AS section_name, 'Montaña' AS category_name,
     'Bicicleta de montaña con cuadro de carbono y suspensión para rutas exigentes.' AS name,
@@ -241,12 +241,12 @@ FROM (
     JSON_OBJECT('proteccion', 'MIPS'),
     620000, 10, '/assets/products/img-018.jpg', 'Seguridad'
 ) seed
-JOIN sections s ON s.name = seed.section_name
-JOIN categories c ON c.section_id = s.id AND c.name = seed.category_name
+JOIN sections s ON s.nombre_seccion = seed.section_name
+JOIN categories c ON c.id_seccion = s.id_seccion AND c.nombre_categoria = seed.category_name
 WHERE NOT EXISTS (SELECT 1 FROM products LIMIT 1);
 
-INSERT INTO product_sizes (product_id, name)
-SELECT p.id, sizes.name
+INSERT INTO product_sizes (id_producto, nombre_talla)
+SELECT p.id_producto, sizes.name
 FROM products p
 JOIN (
   SELECT 'Specialized Stumpjumper Pro Carbon Trail' AS product_name, 'S' AS name UNION ALL
@@ -255,5 +255,5 @@ JOIN (
   SELECT 'Specialized Stumpjumper Pro Carbon Trail', 'XL' UNION ALL
   SELECT 'Trek Émonda SLR 7 Disc Di2', '54 cm' UNION ALL
   SELECT 'Trek Émonda SLR 7 Disc Di2', '56 cm'
-) sizes ON sizes.product_name = p.name
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+) sizes ON sizes.product_name = p.nombre_producto
+ON DUPLICATE KEY UPDATE nombre_talla = VALUES(nombre_talla);

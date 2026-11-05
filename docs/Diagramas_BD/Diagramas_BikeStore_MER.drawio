@@ -375,6 +375,31 @@
         <mxCell id="WExOL-ceVbVRG8uX2jVL-5" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;" value="Delete" vertex="1">
           <mxGeometry height="40" width="100" x="240" y="40" as="geometry" />
         </mxCell>
+        <mxCell id="model-product-category-relation" parent="1" style="shape=rhombus;perimeter=rhombusPerimeter;whiteSpace=wrap;html=1;align=center;" value="Clasifica" vertex="1">
+          <mxGeometry height="60" width="120" x="250" y="1120" as="geometry" />
+        </mxCell>
+        <mxCell id="model-category-classifies-product" edge="1" parent="1" source="v32LN1gUM7CQBCw7oG4u-90" target="model-product-category-relation" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-240" y="1060" />
+              <mxPoint x="290" y="1060" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="model-classification-cardinality" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="1:N" vertex="1">
+          <mxGeometry height="30" width="60" x="-40" y="1025" as="geometry" />
+        </mxCell>
+        <mxCell id="model-classifies-product" edge="1" parent="1" source="model-product-category-relation" target="2-KfMtCfq0Yq3ixvZ1Z--3" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="800" y="1150" />
+              <mxPoint x="800" y="860" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="model-classified-product-cardinality" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="N:1" vertex="1">
+          <mxGeometry height="30" width="60" x="810" y="1000" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

@@ -16,7 +16,7 @@ Desde la raíz del repositorio importa el esquema:
 mysql -u root -p < sql\bikestore.sql
 ```
 
-Si ya importaste el esquema anterior y conservas datos, ejecuta una sola vez `sql/migrations/2026-11-05-align-role-product-model.sql` desde MySQL Workbench. Es una migración aditiva: agrega los permisos CRUD de rol y la relación producto-sección del modelo, y rellena la nueva clave de sección a partir de la categoría existente.
+Si ya importaste el esquema anterior y conservas datos, ejecuta las migraciones desde MySQL Workbench una sola vez y en este orden: `sql/migrations/2026-11-05-align-role-product-model.sql` y `sql/migrations/2026-11-05-align-model-attributes.sql`. La primera agrega permisos CRUD y la relación producto-sección; la segunda conserva los registros y renombra las columnas al español. Si ya aplicaste la primera migración, ejecuta solo la segunda.
 
 Configura el backend:
 
@@ -73,7 +73,7 @@ El pago es simulado: no se almacenan números de tarjeta ni CVV. Las rutas admin
 
 ## Modelo y trazabilidad documental
 
-El esquema implementa usuarios/roles, secciones/categorías, productos, imágenes/tallas, carritos, pedidos/detalles/pagos y códigos de recuperación. Las claves foráneas, restricciones `UNIQUE`, `CHECK`, estados y transacciones protegen unicidad, stock, saldos y relaciones. `users.password_hash` y los códigos hash de recuperación atienden RNF-05; las claves foráneas y las operaciones transaccionales preservan RNF-06. RF-08 se implementa con carritos persistidos; RF-30 con JWT y middleware; RF-29 solo permite inactivar cuentas, conforme a la restricción del instructor.
+El esquema implementa usuarios/roles, secciones/categorías, productos, imágenes/tallas, carritos, pedidos/detalles/pagos y códigos de recuperación. Las columnas de las entidades del modelo usan los nombres en español de los diagramas; Producto se relaciona con Sección y Categoría, y Categoría pertenece a Sección. Las claves foráneas, restricciones `UNIQUE`, `CHECK`, estados y transacciones protegen unicidad, stock, saldos y relaciones. `users.contraseña_hash` y los códigos hash de recuperación atienden RNF-05; las claves foráneas y las operaciones transaccionales preservan RNF-06. RF-08 se implementa con carritos persistidos; RF-30 con JWT y middleware; RF-29 solo permite inactivar cuentas, conforme a la restricción del instructor.
 
 | Flujo e historias según los archivos HU | CU / RF | Datos y API | Superficie React |
 |---|---|---|---|

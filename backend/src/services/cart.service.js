@@ -4,9 +4,9 @@ const AppError = require('../utils/AppError');
 async function findOrCreateCart(connection, userId, guestKey) {
     let rows;
     if (userId) {
-        [rows] = await connection.execute('SELECT id FROM carts WHERE user_id = ? FOR UPDATE', [userId]);
+           [rows] = await connection.execute('SELECT id FROM carts WHERE id_usuario = ? FOR UPDATE', [userId]);
         if (rows.length) return rows[0].id;
-        const [result] = await connection.execute('INSERT INTO carts (user_id) VALUES (?)', [userId]);
+           const [result] = await connection.execute('INSERT INTO carts (id_usuario) VALUES (?)', [userId]);
         return result.insertId;
     }
     if (!/^[0-9a-f-]{36}$/i.test(guestKey || '')) throw new AppError('La sesión del carrito no es válida', 400);
@@ -21,13 +21,15 @@ async function getCart({ userId, guestKey }) {
     try {
         const cartId = await findOrCreateCart(connection, userId, guestKey);
         const [rows] = await connection.execute(
-            `SELECT p.id, ci.id AS cartItemId, p.name, p.description, p.price, p.stock, p.image_url AS image,
-                    p.badge, p.status, c.name AS category, s.name AS section,
+                `SELECT p.id_producto AS id, ci.id AS cartItemId, p.nombre_producto AS name,
+                    p.descripcion_general AS description, p.precio_producto AS price, p.stock,
+                    p.imagen_producto AS image, p.badge, p.estado_producto AS status,
+                    c.nombre_categoria AS category, s.nombre_seccion AS section,
                     ci.quantity AS qty, ci.selected_size AS selectedSize
              FROM cart_items ci
-             JOIN products p ON p.id = ci.product_id
-             JOIN categories c ON c.id = p.category_id
-             JOIN sections s ON s.id = c.section_id
+                 JOIN products p ON p.id_producto = ci.id_producto
+                 JOIN categories c ON c.id_categoria = p.id_categoria
+                 JOIN sections s ON s.id_seccion = p.id_seccion
              WHERE ci.cart_id = ? ORDER BY ci.created_at`,
             [cartId]
         );
@@ -55,8 +57,8 @@ async function addItem({ userId, guestKey, productId, quantity, selectedSize }) 
         await connection.beginTransaction();
         const cartId = await findOrCreateCart(connection, userId, guestKey);
         const [products] = await connection.execute(
-            `SELECT p.id, p.stock, p.status
-             FROM products p WHERE p.id = ? FOR UPDATE`,
+                        `SELECT p.id_producto AS id, p.stock, p.estado_producto AS status
+                         FROM products p WHERE p.id_producto = ? FOR UPDATE`,
             [productId]
         );
         const product = products[0];
@@ -64,10 +66,10 @@ async function addItem({ userId, guestKey, productId, quantity, selectedSize }) 
         if (!product.stock) throw new AppError('El producto no tiene existencias', 409);
 
         const size = typeof selectedSize === 'string' ? selectedSize.trim() : '';
-        const [sizes] = await connection.execute('SELECT id FROM product_sizes WHERE product_id = ? LIMIT 1', [productId]);
+        const [sizes] = await connection.execute('SELECT id_talla FROM product_sizes WHERE id_producto = ? LIMIT 1', [productId]);
         if (sizes.length) {
             const [selected] = await connection.execute(
-                'SELECT id FROM product_sizes WHERE product_id = ? AND name = ?',
+                'SELECT id_talla FROM product_sizes WHERE id_producto = ? AND nombre_talla = ?',
                 [productId, size]
             );
             if (!selected.length) throw new AppError('Selecciona una talla disponible', 400);
@@ -75,7 +77,7 @@ async function addItem({ userId, guestKey, productId, quantity, selectedSize }) 
 
         const [existing] = await connection.execute(
             `SELECT id, quantity FROM cart_items
-             WHERE cart_id = ? AND product_id = ? AND selected_size = ? FOR UPDATE`,
+                         WHERE cart_id = ? AND id_producto = ? AND selected_size = ? FOR UPDATE`,
             [cartId, productId, size]
         );
         const updatedQuantity = Math.min(Number(existing[0]?.quantity || 0) + Number(quantity), Number(product.stock));
@@ -83,7 +85,7 @@ async function addItem({ userId, guestKey, productId, quantity, selectedSize }) 
             await connection.execute('UPDATE cart_items SET quantity = ? WHERE id = ?', [updatedQuantity, existing[0].id]);
         } else {
             await connection.execute(
-                'INSERT INTO cart_items (cart_id, product_id, selected_size, quantity) VALUES (?, ?, ?, ?)',
+                'INSERT INTO cart_items (cart_id, id_producto, selected_size, quantity) VALUES (?, ?, ?, ?)',
                 [cartId, productId, size, updatedQuantity]
             );
         }
@@ -106,9 +108,9 @@ async function updateItem({ userId, guestKey, cartItemId, quantity }) {
         await connection.beginTransaction();
         const cartId = await findOrCreateCart(connection, userId, guestKey);
         const [products] = await connection.execute(
-            `SELECT p.stock, p.status, ci.id AS item_id
+            `SELECT p.stock, p.estado_producto AS status, ci.id AS item_id
              FROM products p
-             JOIN cart_items ci ON ci.product_id = p.id AND ci.cart_id = ?
+             JOIN cart_items ci ON ci.id_producto = p.id_producto AND ci.cart_id = ?
              WHERE ci.id = ? FOR UPDATE`,
             [cartId, cartItemId]
         );
@@ -150,26 +152,27 @@ async function claimGuestCart(userId, guestKey) {
         const guestCartId = guestCarts[0].id;
         const userCartId = await findOrCreateCart(connection, userId);
         const [items] = await connection.execute(
-            `SELECT ci.product_id, ci.selected_size, ci.quantity, p.stock, p.status
-             FROM cart_items ci JOIN products p ON p.id = ci.product_id WHERE ci.cart_id = ?`,
+                `SELECT ci.id_producto AS product_id, ci.selected_size, ci.quantity,
+                    p.stock, p.estado_producto AS status
+                 FROM cart_items ci JOIN products p ON p.id_producto = ci.id_producto WHERE ci.cart_id = ?`,
             [guestCartId]
         );
         for (const item of items) {
             if (item.status !== 'active' || !Number(item.stock)) continue;
             const [existing] = await connection.execute(
                 `SELECT quantity FROM cart_items
-                 WHERE cart_id = ? AND product_id = ? AND selected_size = ?`,
+                 WHERE cart_id = ? AND id_producto = ? AND selected_size = ?`,
                 [userCartId, item.product_id, item.selected_size]
             );
             const quantity = Math.min(Number(item.stock), Number(item.quantity) + Number(existing[0]?.quantity || 0));
             if (existing.length) {
                 await connection.execute(
-                    'UPDATE cart_items SET quantity = ? WHERE cart_id = ? AND product_id = ? AND selected_size = ?',
+                    'UPDATE cart_items SET quantity = ? WHERE cart_id = ? AND id_producto = ? AND selected_size = ?',
                     [quantity, userCartId, item.product_id, item.selected_size]
                 );
             } else {
                 await connection.execute(
-                    'INSERT INTO cart_items (cart_id, product_id, selected_size, quantity) VALUES (?, ?, ?, ?)',
+                    'INSERT INTO cart_items (cart_id, id_producto, selected_size, quantity) VALUES (?, ?, ?, ?)',
                     [userCartId, item.product_id, item.selected_size, quantity]
                 );
             }

@@ -99,7 +99,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="62TWEKevDtziVYhR_5wI-14" parent="1" style="shape=table;startSize=30;container=1;collapsible=1;childLayout=tableLayout;fixedRows=1;rowLines=0;fontStyle=1;align=center;resizeLast=1;html=1;whiteSpace=wrap;" value="Producto" vertex="1">
-          <mxGeometry height="270" width="220" x="-80" y="570" as="geometry" />
+          <mxGeometry height="300" width="220" x="-80" y="570" as="geometry" />
         </mxCell>
         <mxCell id="62TWEKevDtziVYhR_5wI-15" parent="62TWEKevDtziVYhR_5wI-14" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;fillColor=none;collapsible=0;dropTarget=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;top=0;left=0;right=0;bottom=0;html=1;" value="" vertex="1">
           <mxGeometry height="30" width="220" y="30" as="geometry" />
@@ -204,6 +204,18 @@
           <mxGeometry height="30" width="160" x="60" as="geometry">
             <mxRectangle height="30" width="160" as="alternateBounds" />
           </mxGeometry>
+        </mxCell>
+        <mxCell id="model-product-category-row" parent="62TWEKevDtziVYhR_5wI-14" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;fillColor=none;collapsible=0;dropTarget=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;top=0;left=0;right=0;bottom=0;html=1;" value="" vertex="1">
+          <mxGeometry height="30" width="220" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="model-product-category-fk" parent="model-product-category-row" style="shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;fontStyle=1;overflow=hidden;html=1;whiteSpace=wrap;" value="FK" vertex="1">
+          <mxGeometry height="30" width="60" as="geometry" />
+        </mxCell>
+        <mxCell id="model-product-category-field" parent="model-product-category-row" style="shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;fontStyle=5;overflow=hidden;html=1;whiteSpace=wrap;" value="id_categoria" vertex="1">
+          <mxGeometry height="30" width="160" x="60" as="geometry" />
+        </mxCell>
+        <mxCell id="model-category-product-relationship" edge="1" parent="1" source="ZImjXNbBS6x1_GlFdAy2-54" target="model-product-category-field" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERoneToMany;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="l6P4LiNMfCWw4zHtO_b2-1" parent="1" style="shape=table;startSize=30;container=1;collapsible=1;childLayout=tableLayout;fixedRows=1;rowLines=0;fontStyle=1;align=center;resizeLast=1;html=1;whiteSpace=wrap;" value="Pedido" vertex="1">
           <mxGeometry height="270" width="220" x="304" y="-80" as="geometry" />

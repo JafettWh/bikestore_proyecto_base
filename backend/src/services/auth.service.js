@@ -30,9 +30,14 @@ function validateEmail(email) {
 
 async function findUserByEmail(email) {
     const [rows] = await pool.execute(
-        `SELECT u.*, r.name AS role
-         FROM users u JOIN roles r ON r.id = u.role_id
-         WHERE u.email = ?`,
+        `SELECT u.id_usuario AS id, u.nombre_usuario AS name, u.correo_usuario AS email,
+                u.contraseña_hash AS password_hash, u.telefono_usuario AS phone,
+                u.direccion_detallada AS address, u.barrio AS neighborhood,
+                u.ciudad AS city, u.departamento AS department,
+                u.estado_usuario AS status, u.created_at,
+                r.nombre_rol AS role
+         FROM users u JOIN roles r ON r.id_rol = u.id_rol
+         WHERE u.correo_usuario = ?`,
         [email]
     );
     return rows[0] || null;
@@ -54,8 +59,8 @@ async function registerUser({ name, nombre, email, password, phone, acceptedTerm
     const hash = await bcrypt.hash(password, 12);
     try {
         const [result] = await pool.execute(
-            `INSERT INTO users (role_id, name, email, password_hash, phone, terms_accepted_at)
-             SELECT id, ?, ?, ?, ?, CURRENT_TIMESTAMP FROM roles WHERE name = 'cliente'`,
+            `INSERT INTO users (id_rol, nombre_usuario, correo_usuario, contraseña_hash, telefono_usuario, terms_accepted_at)
+             SELECT id_rol, ?, ?, ?, ?, CURRENT_TIMESTAMP FROM roles WHERE nombre_rol = 'cliente'`,
             [userName, normalizedEmail, hash, phone.trim()]
         );
         return { id: result.insertId };
@@ -91,8 +96,9 @@ async function updateOwnProfile(userId, data) {
     try {
         const [result] = await pool.execute(
             `UPDATE users
-             SET name = ?, email = ?, phone = ?, address = ?, neighborhood = ?, city = ?, department = ?
-             WHERE id = ? AND status = 'active'`,
+             SET nombre_usuario = ?, correo_usuario = ?, telefono_usuario = ?, direccion_detallada = ?,
+                 barrio = ?, ciudad = ?, departamento = ?
+             WHERE id_usuario = ? AND estado_usuario = 'active'`,
             [
                 name,
                 email,
@@ -114,8 +120,13 @@ async function updateOwnProfile(userId, data) {
 
 async function findUserById(id) {
     const [rows] = await pool.execute(
-        `SELECT u.*, r.name AS role FROM users u
-         JOIN roles r ON r.id = u.role_id WHERE u.id = ?`,
+        `SELECT u.id_usuario AS id, u.nombre_usuario AS name, u.correo_usuario AS email,
+                u.contraseña_hash AS password_hash, u.telefono_usuario AS phone,
+                u.direccion_detallada AS address, u.barrio AS neighborhood,
+                u.ciudad AS city, u.departamento AS department,
+                u.estado_usuario AS status, u.created_at,
+            r.nombre_rol AS role
+         FROM users u JOIN roles r ON r.id_rol = u.id_rol WHERE u.id_usuario = ?`,
         [id]
     );
     return rows[0] || null;
@@ -237,8 +248,8 @@ async function resetPassword({ resetToken, password }) {
     try {
         await connection.beginTransaction();
         const [rows] = await connection.execute(
-            `SELECT pr.id, pr.user_id, pr.verified_at, pr.expires_at, pr.used_at, u.password_hash
-             FROM password_reset_codes pr JOIN users u ON u.id = pr.user_id
+            `SELECT pr.id, pr.user_id, pr.verified_at, pr.expires_at, pr.used_at, u.contraseña_hash AS password_hash
+             FROM password_reset_codes pr JOIN users u ON u.id_usuario = pr.user_id
              WHERE pr.id = ? AND pr.user_id = ? FOR UPDATE`,
             [claims.resetId, claims.userId]
         );
@@ -250,7 +261,7 @@ async function resetPassword({ resetToken, password }) {
             throw new AppError('La nueva contraseña debe ser diferente a la anterior', 400);
         }
         const hash = await bcrypt.hash(password, 12);
-        await connection.execute('UPDATE users SET password_hash = ? WHERE id = ?', [hash, claims.userId]);
+        await connection.execute('UPDATE users SET `contraseña_hash` = ? WHERE id_usuario = ?', [hash, claims.userId]);
         await connection.execute('UPDATE password_reset_codes SET used_at = NOW() WHERE id = ?', [record.id]);
         await connection.commit();
         return { message: 'Contraseña actualizada. Ya puedes iniciar sesión.' };

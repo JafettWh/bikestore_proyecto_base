@@ -71,9 +71,9 @@ function validateProduct(data) {
 
 async function categoryIdFor(section, category, connection = pool) {
     const [rows] = await connection.execute(
-        `SELECT c.id, c.section_id FROM categories c
-         JOIN sections s ON s.id = c.section_id
-         WHERE s.name = ? AND c.name = ?`,
+        `SELECT c.id_categoria AS id, c.id_seccion AS section_id FROM categories c
+         JOIN sections s ON s.id_seccion = c.id_seccion
+         WHERE s.nombre_seccion = ? AND c.nombre_categoria = ?`,
         [section, category]
     );
     if (!rows.length) throw new AppError('La categoría seleccionada no existe', 400);
@@ -86,13 +86,13 @@ async function attachProductOptions(rows) {
     const placeholders = ids.map(() => '?').join(',');
     const [[images], [sizes]] = await Promise.all([
         pool.execute(
-            `SELECT product_id, image_url FROM product_images
-             WHERE product_id IN (${placeholders}) ORDER BY position, id`,
+            `SELECT id_producto AS product_id, url_imagen AS image_url FROM product_images
+             WHERE id_producto IN (${placeholders}) ORDER BY position, id_imagen`,
             ids
         ),
         pool.execute(
-            `SELECT product_id, name FROM product_sizes
-             WHERE product_id IN (${placeholders}) ORDER BY id`,
+            `SELECT id_producto AS product_id, nombre_talla AS name FROM product_sizes
+             WHERE id_producto IN (${placeholders}) ORDER BY id_talla`,
             ids
         )
     ]);
@@ -110,31 +110,35 @@ async function attachProductOptions(rows) {
 async function listProducts({ search = '', section = '', category = '', categoryId = '', status = '', sort = '' } = {}, admin = false) {
     const conditions = [];
     const params = [];
-    if (!admin) conditions.push("p.status = 'active'");
-    if (status === 'Activo' || status === 'active') conditions.push("p.status = 'active'");
-    if (status === 'Inactivo' || status === 'inactive') conditions.push("p.status = 'inactive'");
+    if (!admin) conditions.push("p.estado_producto = 'active'");
+    if (status === 'Activo' || status === 'active') conditions.push("p.estado_producto = 'active'");
+    if (status === 'Inactivo' || status === 'inactive') conditions.push("p.estado_producto = 'inactive'");
     if (section) {
-        conditions.push('s.name = ?');
+        conditions.push('s.nombre_seccion = ?');
         params.push(section);
     }
     if (categoryId && /^\d+$/.test(String(categoryId))) {
-        conditions.push('c.id = ?');
+        conditions.push('c.id_categoria = ?');
         params.push(Number(categoryId));
     } else if (category) {
-        conditions.push('c.name = ?');
+        conditions.push('c.nombre_categoria = ?');
         params.push(category);
     }
     if (search.trim()) {
-        conditions.push('(p.name LIKE ? OR c.name LIKE ? OR s.name LIKE ?)');
+        conditions.push('(p.nombre_producto LIKE ? OR c.nombre_categoria LIKE ? OR s.nombre_seccion LIKE ?)');
         const query = `%${search.trim()}%`;
         params.push(query, query, query);
     }
-    const ordering = sort === 'asc' ? 'p.price ASC' : sort === 'desc' ? 'p.price DESC' : 'p.id DESC';
+    const ordering = sort === 'asc' ? 'p.precio_producto ASC' : sort === 'desc' ? 'p.precio_producto DESC' : 'p.id_producto DESC';
     const [rows] = await pool.execute(
-        `SELECT p.*, c.id AS category_id, c.name AS category, s.name AS section
+        `SELECT p.id_producto AS id, p.nombre_producto AS name, p.descripcion_general AS description,
+                p.especificaciones_tecnicas AS technical_specs, p.precio_producto AS price, p.stock,
+                p.imagen_producto AS image_url, p.badge, p.estado_producto AS status,
+                p.motivo_inactivacion AS inactivation_reason,
+                c.id_categoria AS category_id, c.nombre_categoria AS category, s.nombre_seccion AS section
          FROM products p
-         JOIN categories c ON c.id = p.category_id
-         JOIN sections s ON s.id = c.section_id
+         JOIN categories c ON c.id_categoria = p.id_categoria
+         JOIN sections s ON s.id_seccion = p.id_seccion
          ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
          ORDER BY ${ordering}`,
         params
@@ -145,10 +149,14 @@ async function listProducts({ search = '', section = '', category = '', category
 async function getProduct(id, admin = false) {
     if (!/^\d+$/.test(String(id))) throw new AppError('Identificador de producto inválido', 400);
     const [rows] = await pool.execute(
-        `SELECT p.*, c.id AS category_id, c.name AS category, s.name AS section
-         FROM products p JOIN categories c ON c.id = p.category_id
-         JOIN sections s ON s.id = c.section_id
-         WHERE p.id = ? ${admin ? '' : "AND p.status = 'active'"}`,
+        `SELECT p.id_producto AS id, p.nombre_producto AS name, p.descripcion_general AS description,
+            p.especificaciones_tecnicas AS technical_specs, p.precio_producto AS price, p.stock,
+            p.imagen_producto AS image_url, p.badge, p.estado_producto AS status,
+            p.motivo_inactivacion AS inactivation_reason,
+            c.id_categoria AS category_id, c.nombre_categoria AS category, s.nombre_seccion AS section
+         FROM products p JOIN categories c ON c.id_categoria = p.id_categoria
+         JOIN sections s ON s.id_seccion = p.id_seccion
+         WHERE p.id_producto = ? ${admin ? '' : "AND p.estado_producto = 'active'"}`,
         [id]
     );
     if (!rows.length) throw new AppError('El producto consultado no existe', 404);
@@ -157,9 +165,9 @@ async function getProduct(id, admin = false) {
 
 async function listCategories() {
     const [rows] = await pool.execute(
-        `SELECT c.id, c.name, s.name AS section
-         FROM categories c JOIN sections s ON s.id = c.section_id
-         ORDER BY s.id, c.name`
+        `SELECT c.id_categoria AS id, c.nombre_categoria AS name, s.nombre_seccion AS section
+         FROM categories c JOIN sections s ON s.id_seccion = c.id_seccion
+         ORDER BY s.id_seccion, c.nombre_categoria`
     );
     return rows.map((row) => ({ id: row.id, name: row.name, section: row.section }));
 }
@@ -176,8 +184,9 @@ async function createProduct(data, fileName) {
         connection = await pool.getConnection();
         await connection.beginTransaction();
         const [result] = await connection.execute(
-            `INSERT INTO products
-             (section_id, category_id, name, description, technical_specs, price, stock, image_url, badge)
+                        `INSERT INTO products
+                         (id_seccion, id_categoria, nombre_producto, descripcion_general, especificaciones_tecnicas,
+                            precio_producto, stock, imagen_producto, badge)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 sectionId,
@@ -195,14 +204,14 @@ async function createProduct(data, fileName) {
         for (const [position, imageUrl] of arrayValue(data.gallery).entries()) {
             if (imageUrl && imageUrl !== image) {
                 await connection.execute(
-                    'INSERT INTO product_images (product_id, image_url, position) VALUES (?, ?, ?)',
+                    'INSERT INTO product_images (id_producto, url_imagen, position) VALUES (?, ?, ?)',
                     [productId, imageUrl, position]
                 );
             }
         }
         for (const size of arrayValue(data.sizes)) {
             if (typeof size === 'string' && size.trim()) {
-                await connection.execute('INSERT INTO product_sizes (product_id, name) VALUES (?, ?)', [productId, size.trim()]);
+                await connection.execute('INSERT INTO product_sizes (id_producto, nombre_talla) VALUES (?, ?)', [productId, size.trim()]);
             }
         }
         await connection.commit();
@@ -229,8 +238,9 @@ async function updateProduct(id, data, fileName) {
         connection = await pool.getConnection();
         await connection.beginTransaction();
         await connection.execute(
-            `UPDATE products SET section_id = ?, category_id = ?, name = ?, description = ?, technical_specs = ?,
-             price = ?, stock = ?, image_url = ?, badge = ? WHERE id = ?`,
+            `UPDATE products SET id_seccion = ?, id_categoria = ?, nombre_producto = ?, descripcion_general = ?,
+             especificaciones_tecnicas = ?, precio_producto = ?, stock = ?, imagen_producto = ?, badge = ?
+             WHERE id_producto = ?`,
             [
                 sectionId,
                 categoryId,
@@ -246,10 +256,10 @@ async function updateProduct(id, data, fileName) {
         );
         if (data.sizes !== undefined) {
             const sizes = arrayValue(data.sizes);
-            await connection.execute('DELETE FROM product_sizes WHERE product_id = ?', [id]);
+            await connection.execute('DELETE FROM product_sizes WHERE id_producto = ?', [id]);
             for (const size of sizes) {
                 if (typeof size === 'string' && size.trim()) {
-                    await connection.execute('INSERT INTO product_sizes (product_id, name) VALUES (?, ?)', [id, size.trim()]);
+                    await connection.execute('INSERT INTO product_sizes (id_producto, nombre_talla) VALUES (?, ?)', [id, size.trim()]);
                 }
             }
         }
@@ -268,8 +278,8 @@ async function updateProduct(id, data, fileName) {
 async function deactivateProduct(id, reason) {
     if (typeof reason !== 'string' || !reason.trim()) throw new AppError('El motivo de inactivación es obligatorio', 400);
     const [result] = await pool.execute(
-        `UPDATE products SET status = 'inactive', inactivation_reason = ?
-         WHERE id = ? AND status = 'active'`,
+        `UPDATE products SET estado_producto = 'inactive', motivo_inactivacion = ?
+         WHERE id_producto = ? AND estado_producto = 'active'`,
         [reason.trim(), id]
     );
     if (!result.affectedRows) throw new AppError('Producto activo no encontrado', 404);
