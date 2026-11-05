@@ -4,10 +4,9 @@ const env = require('../config/env');
 function createToken(user) {
     return jwt.sign(
         {
-        id_usuario: user.id_usuario,
-        nombre: user.nombre,
+        id: user.id,
         email: user.email,
-        rol: user.rol 
+        rol: user.role
         },
         env.jwt.secret,
         { expiresIn: env.jwt.expiresIn }

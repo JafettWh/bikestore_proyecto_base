@@ -10,5 +10,6 @@ export const APP_NAME = import.meta.env.VITE_APP_NAME || "BikeStore";
 // Se resuelve contra la URL real de la página, así no depende de la raíz del servidor.
 export const asset = (path = "") => {
   if (!path || /^(https?:|data:|blob:)/.test(path)) return path;
+  if (path.startsWith("/uploads/")) return `${API_URL.replace(/\/api$/, "")}${path}`;
   return new URL(path.replace(/^\/+/, ""), document.baseURI).href;
 };

@@ -1,69 +1,57 @@
-# BikeStore – Frontend
+# BikeStore - Frontend
 
-Tienda virtual de bicicletas deportivas y accesorios. React 19 + Vite + Tailwind CSS 4.
+Tienda virtual de bicicletas y accesorios construida con React 19 + Vite. El catálogo, las cuentas, los carritos, pedidos, métricas e informes se consultan mediante la API Node/Express y MySQL; el navegador ya no admite contraseñas ni pedidos ficticios como fuente de verdad.
+
+## Ejecutar localmente
+
+Requiere Node.js 20.19 o superior y MySQL con el esquema importado (ver [backend/README.md](../backend/README.md)).
+
+```powershell
+cd backend
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
+
+En otra terminal:
+
+```powershell
+cd frontend
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
+
+Abre `http://localhost:5173`. La URL del API se configura en `frontend/.env` con `VITE_API_URL`. `iniciar.bat` también inicia ambas aplicaciones una vez preparados MySQL y los `.env`.
+
+### Usuarios locales
+
+El backend crea las cuentas de prueba configuradas en `backend/.env.example` la primera vez que inicia:
+
+- Administrador: `admin@bikestore.local` / `BikeStoreAdmin2026!`
+- Cliente: `cliente@bikestore.local` / `BikeStoreCliente2026!`
+
+Cambia esas claves antes de compartir el entorno y no publiques un archivo `.env`.
+
+## Funcionalidades conectadas
+
+- Catálogo público activo, búsqueda, filtro combinado por sección/categoría, precio ascendente/descendente y detalle.
+- Registro con nombre, correo, teléfono, contraseña, términos y condiciones; ingreso con JWT; perfil editable sin documento de identidad.
+- Código de recuperación de un solo uso enviado por Gmail (requiere la configuración SMTP descrita en el README del backend).
+- Carrito persistente por visitante/usuario; stock verificado en servidor.
+- Compra de cliente con resumen, envío y pago simulado; las credenciales de tarjeta nunca se almacenan.
+- CRUD administrativo de productos y usuarios, con inactivación lógica y restricción del último administrador activo.
+- Dashboard e informes Excel/PDF que usan los mismos filtros y métricas calculadas sobre pedidos pagados.
+- Campos de formularios sin datos de ejemplo precargados y bordes de campos/tarjetas con radio sutil de 5 px.
 
 ## Estructura
 
-```
-Frontend/
-├── public/assets/        Imágenes (logo y productos). Se copian tal cual a dist/
-├── src/
-│   ├── assets/styles.css Todos los estilos: globales y los de cada componente/página
-│   ├── components/       Componentes reutilizables (Header, Footer, ProductCard, modales, Button...)
-│   ├── config/env.js     Variables de entorno y helper asset() para rutas de imágenes
-│   ├── context/          AuthContext y CartContext (estado global)
-│   ├── data/             Catálogo y datos de ejemplo
-│   ├── hooks/            useAuth y useCart
-│   ├── pages/            Vistas: Home, detalle, carrito, checkout, éxito, acceso, administración
-│   ├── utils/            Formateo de moneda y exportación a Excel/PDF
-│   ├── App.jsx
-│   └── main.jsx
-├── .env.example
-├── index.html
-├── package.json
-└── vite.config.js
-```
+`src/api` y los contextos conectan React con la API; `src/pages` contiene las vistas; `src/components` los elementos reutilizables; `src/assets/styles.css` mantiene los estilos; `public/assets` contiene imágenes estáticas.
 
-## Ejecutar en desarrollo
+## Compilar
 
-Requiere Node.js 20.19 o superior.
-
-```bash
-cd Frontend
-cp .env.example .env     # en Windows: copy .env.example .env
-npm install
-npm run dev              # http://localhost:5173
-```
-
-En Windows también puedes hacer doble clic en `iniciar.bat` (en la raíz del proyecto).
-
-## Publicar en cualquier servidor
-
-```bash
+```powershell
 npm run build
 ```
 
-Se genera la carpeta `dist/` con HTML, CSS y JS estáticos. Sube su contenido a cualquier
-servidor web (Apache/XAMPP, Nginx, IIS, hosting compartido, Netlify, GitHub Pages...).
-Funciona en la raíz del dominio o dentro de una subcarpeta (`https://sitio.com/bikestore/`)
-porque `vite.config.js` usa `base: "./"` y las imágenes se resuelven con `asset()`.
-La navegación es interna (sin rutas en la URL), por lo que no necesita reglas de reescritura.
-
-Para probar el resultado compilado en local: `npm run preview` (http://localhost:4173).
-
-## Notas del prototipo
-
-- Los datos (usuarios, catálogo, carrito, pedidos) se guardan en `localStorage`; no hay backend aún.
-- El inicio de sesión es simulado: acepta cualquier contraseña. Usuarios de ejemplo: `a.silva@bikestore.com` y
-  `jafet.h@bikestore.com` (administradores), `beatriz.m@gmail.com` (cliente).
-- La vista de administración está protegida con `ProtectedRoute` y solo abre para el rol `admin`.
-- Las fuentes (Inter y Barlow Condensed) se cargan desde Google Fonts; sin internet se usa una fuente del sistema.
-
-## Estilos
-
-Todo el CSS vive en `src/assets/styles.css`, y cada componente y página lo importa
-(`import "../assets/styles.css"`). Cada elemento tiene su propia clase (por ejemplo
-`product-card-button-3`, `header-nav-1`) definida en la sección "Estilos de componentes y páginas",
-agrupada por archivo. Las reglas usan `@apply` de Tailwind 4, así que para cambiar un color, tamaño o
-espaciado se edita esa clase en `styles.css`, no el JSX. Los antiguos `style={{ }}` en línea están
-al final del archivo.
+El resultado se genera en `dist/`. Las imágenes cargadas por administradores se sirven desde el backend bajo `/uploads`.

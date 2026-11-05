@@ -4,6 +4,12 @@ import Button from "./Button";
 import Input from "./Input";
 import "../assets/styles.css";
 
+const categoriesBySection = {
+  Bicicletas: ["Montaña", "Carretera / Ruta", "Carretera / Endurance", "Gravel", "E-Bike"],
+  Componentes: ["Transmisión", "Bielas", "Ruedas", "Asiento", "Manubrio", "Cassette"],
+  Accesorios: ["Iluminación", "Protección", "Hidratación", "Tecnología", "Herramientas", "Sensores"],
+};
+
 export const ProductFormModal = ({
   isOpen,
   onClose,
@@ -11,11 +17,12 @@ export const ProductFormModal = ({
   onSave,
 }) => {
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("Montaña");
-  const [section, setSection] = useState("Bicicletas");
+  const [category, setCategory] = useState("");
+  const [section, setSection] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
-  const [image, setImage] = useState("/assets/products/img-005.jpg");
+  const [image, setImage] = useState("");
+  const [imageFile, setImageFile] = useState(null);
   const [badge, setBadge] = useState("");
   const [description, setDescription] = useState("");
   // Campo VARCHAR para Especificaciones Técnicas (CU-09 y CU-11)
@@ -25,11 +32,12 @@ export const ProductFormModal = ({
   useEffect(() => {
     if (productToEdit) {
       setName(productToEdit.name || "");
-      setCategory(productToEdit.category || "Montaña");
-      setSection(productToEdit.section || "Bicicletas");
+      setCategory(productToEdit.category || "");
+      setSection(productToEdit.section || "");
       setPrice(String(productToEdit.price || ""));
       setStock(String(productToEdit.stock ?? ""));
-      setImage(productToEdit.image || "/assets/products/img-005.jpg");
+      setImage(productToEdit.image || "");
+      setImageFile(null);
       setBadge(productToEdit.badge || "");
       setDescription(productToEdit.description || "");
 
@@ -48,12 +56,13 @@ export const ProductFormModal = ({
       }
     } else {
       setName("");
-      setCategory("Montaña");
-      setSection("Bicicletas");
+      setCategory("");
+      setSection("");
       setPrice("");
-      setStock("10");
-      setImage("/assets/products/img-005.jpg");
-      setBadge("Nuevo");
+      setStock("");
+      setImage("");
+      setImageFile(null);
+      setBadge("");
       setDescription("");
       // Limpiar para registro nuevo (CU-09)
       setTechnicalSpecs("");
@@ -63,7 +72,7 @@ export const ProductFormModal = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const numPrice = Number(price);
     const numStock = Number(stock);
@@ -83,29 +92,36 @@ export const ProductFormModal = ({
       setError("Las existencias deben ser un número entero mayor o igual a 0.");
       return;
     }
+    if (!image && !imageFile) {
+      setError("Selecciona una imagen del producto.");
+      return;
+    }
 
-    onSave({
-      id: productToEdit ? productToEdit.id : Date.now(),
-      name: name.trim(),
-      category: category.trim(),
-      section,
-      price: numPrice,
-      stock: numStock,
-      image,
-      badge: badge ? badge.trim() : undefined,
-      description: description.trim() || "Producto de alto rendimiento BikeStore.",
-      // Guardar Especificaciones Técnicas como VARCHAR
-      technicalSpecs: technicalSpecs.trim() || undefined,
-      specs: technicalSpecs.trim()
-        ? technicalSpecs.trim()
-        : productToEdit?.specs || {
-            material: "Aluminio / Carbono",
-            garantia: "Garantía oficial BikeStore 2 años",
-          },
-      status: productToEdit?.status || "Activo",
-    });
-
-    onClose();
+    if (!description.trim()) {
+      setError("La descripción del producto es obligatoria.");
+      return;
+    }
+    try {
+      await onSave({
+        id: productToEdit?.id,
+        name: name.trim(),
+        category: category.trim(),
+        section,
+        price: numPrice,
+        stock: numStock,
+        image,
+        imageFile,
+        badge: badge.trim() || undefined,
+        description: description.trim(),
+        technicalSpecs: technicalSpecs.trim() || undefined,
+        specs: technicalSpecs.trim() || productToEdit?.specs,
+        sizes: productToEdit?.sizes || [],
+        status: productToEdit?.status || "Activo",
+      });
+      onClose();
+    } catch (saveError) {
+      setError(saveError.message || "No fue posible guardar el producto.");
+    }
   };
 
   return (
@@ -153,22 +169,26 @@ export const ProductFormModal = ({
               </label>
               <select
                 value={section}
-                onChange={(e) => setSection(e.target.value)}
+                onChange={(e) => {
+                  setSection(e.target.value);
+                  setCategory("");
+                }}
                 className="product-form-modal-select-1"
               >
+                <option value="">Selecciona una sección</option>
                 <option value="Bicicletas">Bicicletas</option>
                 <option value="Componentes">Componentes</option>
                 <option value="Accesorios">Accesorios</option>
               </select>
             </div>
 
-            <Input
-              label="Categoría Específica"
-              required
-              placeholder="Ej. Montaña, Carretera, Transmisión..."
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            />
+            <div className="product-form-modal-div-6">
+              <label className="product-form-modal-label-1" htmlFor="product-category">Categoría Específica *</label>
+              <select id="product-category" required value={category} onChange={(e) => setCategory(e.target.value)} className="product-form-modal-select-1">
+                <option value="">Selecciona una categoría</option>
+                {(categoriesBySection[section] || []).map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </div>
           </div>
 
           <div className="product-form-modal-div-7">
@@ -204,9 +224,13 @@ export const ProductFormModal = ({
             </label>
             <select
               value={image}
-              onChange={(e) => setImage(e.target.value)}
+              onChange={(e) => {
+                setImage(e.target.value);
+                setImageFile(null);
+              }}
               className="product-form-modal-select-1"
             >
+              <option value="">Selecciona una imagen</option>
               <option value="/assets/products/img-005.jpg">
                 img-005 (Specialized Stumpjumper)
               </option>
@@ -226,6 +250,17 @@ export const ProductFormModal = ({
                 img-018 (Casco Prevail)
               </option>
             </select>
+            <label className="product-form-modal-label-1" htmlFor="product-image-file">O carga una imagen JPG, PNG o WEBP (máximo 2 MB)</label>
+            <input id="product-image-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => {
+              const file = event.target.files?.[0] || null;
+              if (file && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2 * 1024 * 1024)) {
+                setError("Selecciona una imagen JPG, PNG o WEBP de máximo 2 MB.");
+                event.target.value = "";
+                return;
+              }
+              setImageFile(file);
+              setError("");
+            }} />
           </div>
 
           <div className="product-form-modal-div-6">

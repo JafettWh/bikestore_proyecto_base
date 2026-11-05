@@ -58,7 +58,7 @@ const departamentosColombia = {
 };
 
 export const PerfilPage = ({ onNavigate, orders = [] }) => {
-  const { currentUser, updateUser } = useAuth();
+  const { currentUser, updateProfile } = useAuth();
 
   // Modo edición vs visualización
   const [isEditing, setIsEditing] = useState(false);
@@ -69,43 +69,28 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [documentId, setDocumentId] = useState("");
-  const [department, setDepartment] = useState("Valle del Cauca");
-  const [city, setCity] = useState("Palmira");
+  const [department, setDepartment] = useState("");
+  const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
 
   // Carga inicial de datos del cliente actual
   useEffect(() => {
     if (currentUser) {
-      setName(currentUser.name || "Beatriz Mendoza");
-      setEmail(currentUser.email || "beatriz.m@gmail.com");
-      setPhone(currentUser.phone || "315 789 4521");
-      setDocumentId(currentUser.documentId || "1.115.849.201");
-      setDepartment(currentUser.department || "Valle del Cauca");
-      setCity(currentUser.city || "Palmira");
-      setAddress(currentUser.address || "Calle 15 #28-40, Barrio San Pedro");
-      setNeighborhood(currentUser.neighborhood || "San Pedro / Las Mercedes");
-    } else {
-      // Valores por defecto de demostración para cliente BikeStore
-      setName("Beatriz Mendoza");
-      setEmail("beatriz.m@gmail.com");
-      setPhone("315 789 4521");
-      setDocumentId("1.115.849.201");
-      setDepartment("Valle del Cauca");
-      setCity("Palmira");
-      setAddress("Calle 15 #28-40, Barrio San Pedro");
-      setNeighborhood("San Pedro / Las Mercedes");
+      setName(currentUser.name || "");
+      setEmail(currentUser.email || "");
+      setPhone(currentUser.phone || "");
+      setDepartment(currentUser.department || "");
+      setCity(currentUser.city || "");
+      setAddress(currentUser.address || "");
+      setNeighborhood(currentUser.neighborhood || "");
     }
   }, [currentUser]);
 
   // Manejador de cambio de departamento
   const handleDepartmentChange = (newDept) => {
     setDepartment(newDept);
-    const available = departamentosColombia[newDept] || [];
-    if (available.length > 0) {
-      setCity(available[0]);
-    }
+    setCity("");
   };
 
   // Restaurar datos originales al cancelar edición
@@ -113,20 +98,19 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
     if (currentUser) {
       setName(currentUser.name || "");
       setEmail(currentUser.email || "");
-      setPhone(currentUser.phone || "315 789 4521");
-      setDocumentId(currentUser.documentId || "1.115.849.201");
-      setDepartment(currentUser.department || "Valle del Cauca");
-      setCity(currentUser.city || "Palmira");
-      setAddress(currentUser.address || "Calle 15 #28-40, Barrio San Pedro");
-      setNeighborhood(currentUser.neighborhood || "San Pedro / Las Mercedes");
+      setPhone(currentUser.phone || "");
+      setDepartment(currentUser.department || "");
+      setCity(currentUser.city || "");
+      setAddress(currentUser.address || "");
+      setNeighborhood(currentUser.neighborhood || "");
     }
     setErrorMessage("");
     setIsEditing(false);
   };
 
   // Guardar cambios en el perfil del cliente
-  const handleSaveChanges = (e) => {
-    e.preventDefault();
+  const handleSaveChanges = async (e) => {
+    e?.preventDefault();
     setErrorMessage("");
 
     if (!name.trim()) {
@@ -142,19 +126,16 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim(),
-      documentId: documentId.trim(),
       department,
       city,
       address: address.trim(),
       neighborhood: neighborhood.trim(),
     };
 
-    if (currentUser?.id) {
-      const res = updateUser(currentUser.id, updatedData);
-      if (res && !res.success) {
-        setErrorMessage(res.message);
-        return;
-      }
+    const result = await updateProfile(updatedData);
+    if (!result.success) {
+      setErrorMessage(result.message);
+      return;
     }
 
     setSaveSuccess(true);
@@ -315,19 +296,8 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
 
               <div>
                 <Input
-                  label="Documento de Identidad / C.C."
-                  placeholder="Ej. 1.115.849.201"
-                  value={documentId}
-                  onChange={(e) => setDocumentId(e.target.value)}
-                  disabled={!isEditing}
-                  icon={<Icon name="shield" size={16} />}
-                />
-              </div>
-
-              <div>
-                <Input
                   label="Teléfono Móvil / WhatsApp"
-                  placeholder="Ej. 315 789 4521"
+                  placeholder="Teléfono móvil"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   disabled={!isEditing}
@@ -357,6 +327,7 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
                   disabled={!isEditing}
                   className="perfil-select"
                 >
+                  <option value="">Selecciona un departamento</option>
                   {Object.keys(departamentosColombia).map((dep) => (
                     <option key={dep} value={dep}>
                       {dep}
@@ -373,7 +344,8 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
                   disabled={!isEditing}
                   className="perfil-select"
                 >
-                  {(departamentosColombia[department] || ["Ciudad Principal"]).map(
+                  <option value="">Selecciona una ciudad</option>
+                  {(departamentosColombia[department] || []).map(
                     (c) => (
                       <option key={c} value={c}>
                         {c}

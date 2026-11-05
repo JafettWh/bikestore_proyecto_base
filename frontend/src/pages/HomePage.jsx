@@ -4,36 +4,42 @@ import ProductCard from "../components/ProductCard";
 import Icon from "../components/Icon";
 import Button from "../components/Button";
 import "../assets/styles.css";
-export const HomePage = ({ products, onAddToCart, onSelectProduct, }) => {
+export const HomePage = ({ products = [], error = "", onAddToCart, onSelectProduct, }) => {
     // Estados para filtros de CU-01
     const [selectedCategory, setSelectedCategory] = useState("Todas");
+    const [selectedSection, setSelectedSection] = useState("Todas");
     const [sortOrder, setSortOrder] = useState("default");
     // Filtramos solo productos activos para el público (CU-01 alterno 2.2)
     const activeProducts = useMemo(() => {
         return products.filter((p) => p.status === "Activo");
     }, [products]);
     // División por secciones
-    const bikeProducts = useMemo(() => {
-        let list = activeProducts.filter((p) => p.section === "Bicicletas");
-        if (selectedCategory !== "Todas") {
-            list = list.filter((p) => p.category === selectedCategory);
-        }
+    const categories = useMemo(() => [...new Set(activeProducts
+        .filter((product) => selectedSection === "Todas" || product.section === selectedSection)
+        .map((product) => product.category))].sort(), [activeProducts, selectedSection]);
+    const filterAndSort = (section) => {
+        let list = activeProducts.filter((product) =>
+            product.section === section &&
+            (selectedSection === "Todas" || product.section === selectedSection) &&
+            (selectedCategory === "Todas" || product.category === selectedCategory));
         if (sortOrder === "asc") {
-            list = [...list].sort((a, b) => a.price - b.price);
+            list = [...list].sort((a, b) => Number(a.price) - Number(b.price));
         }
         else if (sortOrder === "desc") {
-            list = [...list].sort((a, b) => b.price - a.price);
+            list = [...list].sort((a, b) => Number(b.price) - Number(a.price));
         }
         return list;
-    }, [activeProducts, selectedCategory, sortOrder]);
-    const gearProducts = useMemo(() => activeProducts.filter((p) => p.section === "Componentes"), [activeProducts]);
-    const accessoryProducts = useMemo(() => activeProducts.filter((p) => p.section === "Accesorios"), [activeProducts]);
-    const bikeCategories = ["Todas", "Montaña", "Carretera / Ruta", "Gravel", "E-Bike"];
+    };
+    const bikeProducts = useMemo(() => filterAndSort("Bicicletas"), [activeProducts, selectedCategory, selectedSection, sortOrder]);
+    const gearProducts = useMemo(() => filterAndSort("Componentes"), [activeProducts, selectedCategory, selectedSection, sortOrder]);
+    const accessoryProducts = useMemo(() => filterAndSort("Accesorios"), [activeProducts, selectedCategory, selectedSection, sortOrder]);
+    const hasProducts = bikeProducts.length + gearProducts.length + accessoryProducts.length > 0;
     return (<main className="home-main-1">
       {/* Hero Principal */}
       <HeroBanner onExploreCatalog={() => {
             document.getElementById("bicicletas")?.scrollIntoView({ behavior: "smooth" });
         }}/>
+      {error && <div className="catalog-error" role="alert">{error}</div>}
 
       {/* Franja de Beneficios y Garantías */}
       <div className="home-div-1">
@@ -80,31 +86,33 @@ export const HomePage = ({ products, onAddToCart, onSelectProduct, }) => {
         </div>
       </div>
 
-      {/* SECCIÓN 1: BICICLETAS (Con Filtro por Categoría y Orden por Precio CU-01) */}
+      {/* Filtros compartidos del catálogo (CU-01) */}
       <section id="bicicletas" className="home-section-1">
         <div className="home-div-5">
           <div>
             <span className="home-span-3">
-              Catálogo Oficial 2026
+              Catálogo BikeStore
             </span>
-            <h2 className="home-h2-1">
-              Bicicletas de Alto Rendimiento
-            </h2>
+            <h2 className="home-h2-1">Catálogo de Productos</h2>
             <p className="home-p-1">
-              Máquinas diseñadas para competición, entrenamiento de fondo y aventuras gravel.
+              Filtra por sección o categoría y ordena los productos por precio.
             </p>
           </div>
 
-          {/* Controles de Filtro y Ordenamiento */}
           <div className="home-div-6">
-            <div className="home-div-7">
-              {bikeCategories.map((cat) => (<button key={cat} onClick={() => setSelectedCategory(cat)} className={`home-button-1 ${selectedCategory === cat
-                ? "home-button-2"
-                : "home-button-3"}`}>
-                  {cat}
-                </button>))}
-            </div>
-
+            <select value={selectedSection} onChange={(event) => {
+              setSelectedSection(event.target.value);
+              setSelectedCategory("Todas");
+            }} className="home-select-1" aria-label="Filtrar por sección">
+              <option value="Todas">Todas las secciones</option>
+              <option value="Bicicletas">Bicicletas</option>
+              <option value="Componentes">Componentes</option>
+              <option value="Accesorios">Accesorios</option>
+            </select>
+            <select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} className="home-select-1" aria-label="Filtrar por categoría">
+              <option value="Todas">Todas las categorías</option>
+              {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
             <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="home-select-1">
               <option value="default">Ordenar por: Relevancia</option>
               <option value="asc">Precio: Menor a Mayor</option>
@@ -113,28 +121,22 @@ export const HomePage = ({ products, onAddToCart, onSelectProduct, }) => {
           </div>
         </div>
 
-        {/* Grilla de Bicicletas */}
-        {bikeProducts.length === 0 ? (<div className="home-div-8">
-            <Icon name="bike" size={40} className="home-icon-1"/>
-            <h3 className="home-h3-1">
-              No hay bicicletas disponibles en esta categoría
-            </h3>
-            <p className="home-p-2">
-              Prueba cambiando los filtros seleccionados o consulta nuestro catálogo completo.
-            </p>
-            <Button variant="outline" size="sm" className="home-button-4" onClick={() => {
-                setSelectedCategory("Todas");
-                setSortOrder("default");
-            }}>
-              Restablecer Filtros
-            </Button>
-          </div>) : (<div className="home-div-9">
-            {bikeProducts.map((product) => (<ProductCard key={product.id} product={product} onAddToCart={onAddToCart} onViewDetail={onSelectProduct}/>))}
-          </div>)}
+        {!hasProducts && <div className="home-div-8">
+          <Icon name="bike" size={40} className="home-icon-1"/>
+          <h3 className="home-h3-1">{error ? "No hay productos disponibles por el momento" : "No se encontraron productos"}</h3>
+          <Button variant="outline" size="sm" className="home-button-4" onClick={() => {
+            setSelectedSection("Todas");
+            setSelectedCategory("Todas");
+            setSortOrder("default");
+          }}>Restablecer Filtros</Button>
+        </div>}
+        {bikeProducts.length > 0 && <div className="home-div-9">
+          {bikeProducts.map((product) => <ProductCard key={product.id} product={product} onAddToCart={onAddToCart} onViewDetail={onSelectProduct}/>)}
+        </div>}
       </section>
 
       {/* SECCIÓN 2: COMPONENTES */}
-      <section id="componentes" className="home-section-2">
+      {gearProducts.length > 0 && <section id="componentes" className="home-section-2">
         <div className="home-div-10">
           <div>
             <span className="home-span-3">
@@ -152,10 +154,10 @@ export const HomePage = ({ products, onAddToCart, onSelectProduct, }) => {
         <div className="home-div-9">
           {gearProducts.map((product) => (<ProductCard key={product.id} product={product} onAddToCart={onAddToCart} onViewDetail={onSelectProduct}/>))}
         </div>
-      </section>
+      </section>}
 
       {/* SECCIÓN 3: ACCESORIOS */}
-      <section id="accesorios" className="home-section-3">
+      {accessoryProducts.length > 0 && <section id="accesorios" className="home-section-3">
         <div className="home-div-10">
           <div>
             <span className="home-span-3">
@@ -173,7 +175,7 @@ export const HomePage = ({ products, onAddToCart, onSelectProduct, }) => {
         <div className="home-div-9">
           {accessoryProducts.map((product) => (<ProductCard key={product.id} product={product} onAddToCart={onAddToCart} onViewDetail={onSelectProduct}/>))}
         </div>
-      </section>
+      </section>}
     </main>);
 };
 export default HomePage;

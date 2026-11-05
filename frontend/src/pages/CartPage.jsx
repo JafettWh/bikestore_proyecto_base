@@ -8,17 +8,17 @@ import "../assets/styles.css";
 export const CartPage = ({ onNavigate }) => {
     const { items, updateQty, removeItem, subtotal, tax, shipping, total } = useCart();
     const [itemToDelete, setItemToDelete] = useState(null);
-    const handleDecrease = (id, currentQty, name) => {
+    const handleDecrease = (cartItemId, currentQty, name) => {
         if (currentQty <= 1) {
-            setItemToDelete({ id, name });
+            setItemToDelete({ cartItemId, name });
         }
         else {
-            updateQty(id, -1);
+            updateQty(cartItemId, -1);
         }
     };
     const confirmDelete = () => {
         if (itemToDelete) {
-            removeItem(itemToDelete.id);
+            removeItem(itemToDelete.cartItemId);
             setItemToDelete(null);
         }
     };
@@ -54,7 +54,7 @@ export const CartPage = ({ onNavigate }) => {
           {/* Lista de Productos del Carrito */}
           <div className="cart-div-5">
             <div className="cart-div-6">
-              {items.map((item) => (<article key={item.id} className="cart-article-1">
+              {items.map((item) => (<article key={item.cartItemId} className="cart-article-1">
                   {/* Foto y descripción */}
                   <div className="cart-div-7">
                     <img src={asset(item.image)} alt={item.name} className="cart-img-1"/>
@@ -78,11 +78,11 @@ export const CartPage = ({ onNavigate }) => {
                   {/* Controles de Cantidad */}
                   <div className="cart-div-10">
                     <div className="cart-div-11">
-                      <button type="button" onClick={() => handleDecrease(item.id, item.qty, item.name)} className="cart-button-1" aria-label="Disminuir cantidad">
+                      <button type="button" onClick={() => handleDecrease(item.cartItemId, item.qty, item.name)} className="cart-button-1" aria-label="Disminuir cantidad">
                         <Icon name="minus" size={13}/>
                       </button>
                       <span className="cart-span-4">{item.qty}</span>
-                      <button type="button" disabled={item.qty >= item.stock} onClick={() => updateQty(item.id, 1)} className="cart-button-2" aria-label="Aumentar cantidad">
+                      <button type="button" disabled={item.qty >= item.stock} onClick={() => updateQty(item.cartItemId, 1)} className="cart-button-2" aria-label="Aumentar cantidad">
                         <Icon name="plus" size={13}/>
                       </button>
                     </div>
@@ -95,7 +95,7 @@ export const CartPage = ({ onNavigate }) => {
                     </div>
 
                     {/* Botón Eliminar */}
-                    <button type="button" onClick={() => setItemToDelete({ id: item.id, name: item.name })} className="cart-button-3" aria-label={`Eliminar ${item.name}`}>
+                    <button type="button" onClick={() => setItemToDelete({ cartItemId: item.cartItemId, name: item.name })} className="cart-button-3" aria-label={`Eliminar ${item.name}`}>
                       <Icon name="trash" size={18}/>
                     </button>
                   </div>

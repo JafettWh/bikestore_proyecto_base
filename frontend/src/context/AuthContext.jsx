@@ -1,129 +1,164 @@
-import { createContext, useState, useEffect } from "react";
-import { initialUsers } from "../data/mockDb";
+import { createContext, useEffect, useState } from "react";
+import { apiRequest } from "../utils/api";
+
 export const AuthContext = createContext(undefined);
+
+function storedToken() {
+  return localStorage.getItem("bikestore_token");
+}
+
 export const AuthProvider = ({ children }) => {
-    const [users, setUsers] = useState(() => {
-        const saved = localStorage.getItem("bikestore_users");
-        return saved ? JSON.parse(saved) : initialUsers;
-    });
-    const [currentUser, setCurrentUser] = useState(() => {
-        const saved = localStorage.getItem("bikestore_auth_user");
-        return saved ? JSON.parse(saved) : null;
-    });
-    useEffect(() => {
-        localStorage.setItem("bikestore_users", JSON.stringify(users));
-    }, [users]);
-    useEffect(() => {
-        if (currentUser) {
-            localStorage.setItem("bikestore_auth_user", JSON.stringify(currentUser));
+  const [token, setToken] = useState(storedToken);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [isReady, setIsReady] = useState(!storedToken());
+  const [authError, setAuthError] = useState("");
+
+  useEffect(() => {
+    const savedToken = storedToken();
+    if (!savedToken) {
+      localStorage.removeItem("bikestore_auth_user");
+      setIsReady(true);
+      return;
+    }
+
+    apiRequest("/auth/me", { token: savedToken })
+      .then(({ user }) => setCurrentUser(user))
+      .catch((error) => {
+        if (error.status === 401) {
+          localStorage.removeItem("bikestore_token");
+          localStorage.removeItem("bikestore_auth_user");
+          setToken(null);
+        } else {
+          setAuthError(error.message);
         }
-        else {
-            localStorage.removeItem("bikestore_auth_user");
-        }
-    }, [currentUser]);
-    const login = (email, _password) => {
-        const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-        if (found) {
-            if (found.status === "Inactivo") {
-                return { success: false, message: "Tu cuenta ha sido inactivada. Contacta al administrador." };
-            }
-            setCurrentUser(found);
-            return { success: true, message: `Bienvenido de nuevo, ${found.name}`, user: found };
-        }
-        // Si el usuario no estaba en la lista, detectamos automáticamente su rol
-        const isAutoAdmin = email.toLowerCase().includes("admin") || email.toLowerCase().includes("a.silva") || email.toLowerCase().includes("jafet");
-        const defaultRole = isAutoAdmin ? "admin" : "cliente";
-        const newUser = {
-            id: Date.now(),
-            name: email.split("@")[0].toUpperCase(),
-            email,
-            role: defaultRole,
-            status: "Activo",
-            createdAt: new Date().toISOString().split("T")[0],
-        };
-        setUsers((prev) => [...prev, newUser]);
-        setCurrentUser(newUser);
-        return { success: true, message: `Sesión iniciada con éxito (${defaultRole === "admin" ? "Administrador" : "Cliente"})`, user: newUser };
-    };
-    const logout = () => {
-        setCurrentUser(null);
-    };
-    const register = (name, email) => {
-        const exists = users.some((u) => u.email.toLowerCase() === email.toLowerCase());
-        if (exists) {
-            return { success: false, message: "Este correo ya se encuentra registrado." };
-        }
-        const newUser = {
-            id: Date.now(),
-            name,
-            email,
-            role: "cliente",
-            status: "Activo",
-            createdAt: new Date().toISOString().split("T")[0],
-        };
-        setUsers((prev) => [...prev, newUser]);
-        setCurrentUser(newUser);
-        return { success: true, message: "Cuenta creada exitosamente." };
-    };
-    const addUser = (userData) => {
-        const exists = users.some((u) => u.email.toLowerCase() === userData.email.toLowerCase());
-        if (exists) {
-            return { success: false, message: "Ya existe un usuario con este correo electrónico." };
-        }
-        const newUser = {
-            ...userData,
-            id: Date.now(),
-            createdAt: new Date().toISOString().split("T")[0],
-        };
-        setUsers((prev) => [...prev, newUser]);
-        return { success: true, message: "Usuario creado exitosamente." };
-    };
-    const updateUser = (id, data) => {
-        // Regla de negocio CU-16: Debe existir al menos un Administrador activo
-        if (data.role === "cliente" || data.status === "Inactivo") {
-            const target = users.find((u) => u.id === id);
-            if (target && target.role === "admin" && target.status === "Activo") {
-                const activeAdmins = users.filter((u) => u.role === "admin" && u.status === "Activo");
-                if (activeAdmins.length <= 1) {
-                    return {
-                        success: false,
-                        message: "Regla de seguridad: Debe existir siempre al menos un Administrador activo en el sistema.",
-                    };
-                }
-            }
-        }
-        setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...data } : u)));
-        if (currentUser && currentUser.id === id) {
-            setCurrentUser((prev) => (prev ? { ...prev, ...data } : null));
-        }
-        return { success: true, message: "Usuario actualizado exitosamente." };
-    };
-    const deactivateUser = (id) => {
-        const target = users.find((u) => u.id === id);
-        if (!target)
-            return { success: false, message: "Usuario no encontrado." };
-        if (target.role === "admin" && target.status === "Activo") {
-            const activeAdmins = users.filter((u) => u.role === "admin" && u.status === "Activo");
-            if (activeAdmins.length <= 1) {
-                return {
-                    success: false,
-                    message: "No se puede inactivar: El sistema debe mantener al menos un administrador activo.",
-                };
-            }
-        }
-        setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status: "Inactivo" } : u)));
-        return { success: true, message: `Usuario ${target.name} inactivado con éxito.` };
-    };
-    return (<AuthContext.Provider value={{
-            currentUser,
-            users,
-            login,
-            logout,
-            register,
-            addUser,
-            updateUser,
-            deactivateUser,
-        }}>
+      })
+      .finally(() => setIsReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem("bikestore_auth_user", JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem("bikestore_auth_user");
+    }
+  }, [currentUser]);
+
+  const refreshUsers = async (filters = {}) => {
+    if (!token) return [];
+    const query = new URLSearchParams(filters).toString();
+    const { data } = await apiRequest(`/admin/users${query ? `?${query}` : ""}`, { token });
+    setUsers(data);
+    return data;
+  };
+
+  useEffect(() => {
+    if (token && currentUser?.role === "admin") {
+      refreshUsers().catch((error) => setAuthError(error.message));
+    } else {
+      setUsers([]);
+    }
+  }, [token, currentUser?.role]);
+
+  const login = async (email, password) => {
+    try {
+      const { token: newToken, user } = await apiRequest("/auth/login", {
+        method: "POST",
+        body: { email, password },
+      });
+      localStorage.setItem("bikestore_token", newToken);
+      setToken(newToken);
+      setCurrentUser(user);
+      setAuthError("");
+      return { success: true, message: `Bienvenido, ${user.name}`, user };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem("bikestore_token");
+    setToken(null);
+    setCurrentUser(null);
+    setUsers([]);
+  };
+
+  const register = async (name, email, password, phone, acceptedTerms) => {
+    try {
+      const { data } = await apiRequest("/auth/register", {
+        method: "POST",
+        body: { name, email, password, phone, acceptedTerms },
+      });
+      return { success: true, message: "Cuenta creada. Inicia sesión para continuar.", user: data };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  };
+
+  const addUser = async (userData) => {
+    try {
+      await apiRequest("/admin/users", { method: "POST", token, body: userData });
+      await refreshUsers();
+      return { success: true, message: "Usuario creado exitosamente." };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  };
+
+  const updateUser = async (id, data) => {
+    try {
+      const { data: updatedUser } = await apiRequest(`/admin/users/${id}`, {
+        method: "PUT",
+        token,
+        body: data,
+      });
+      await refreshUsers();
+      if (currentUser?.id === Number(id)) setCurrentUser(updatedUser);
+      return { success: true, message: "Usuario actualizado exitosamente." };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  };
+
+  const deactivateUser = async (id) => {
+    try {
+      await apiRequest(`/admin/users/${id}/deactivate`, { method: "PATCH", token });
+      await refreshUsers();
+      return { success: true, message: "Usuario inactivado exitosamente." };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  };
+
+  const updateProfile = async (data) => {
+    try {
+      const { user } = await apiRequest("/auth/me", { method: "PATCH", token, body: data });
+      setCurrentUser(user);
+      return { success: true, user, message: "Datos de perfil actualizados exitosamente." };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        currentUser,
+        users,
+        token,
+        isReady,
+        authError,
+        login,
+        logout,
+        register,
+        addUser,
+        updateUser,
+        deactivateUser,
+        updateProfile,
+        refreshUsers,
+      }}
+    >
       {children}
-    </AuthContext.Provider>);
+    </AuthContext.Provider>
+  );
 };

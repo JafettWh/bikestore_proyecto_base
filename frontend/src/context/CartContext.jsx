@@ -1,83 +1,125 @@
-import { createContext, useState, useEffect } from "react";
+import { createContext, useEffect, useState } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { apiRequest } from "../utils/api";
+
 export const CartContext = createContext(undefined);
+
+function getGuestKey() {
+  let key = localStorage.getItem("bikestore_cart_key");
+  if (!key) {
+    key = crypto.randomUUID();
+    localStorage.setItem("bikestore_cart_key", key);
+  }
+  return key;
+}
+
 export const CartProvider = ({ children }) => {
-    const [items, setItems] = useState(() => {
-        const saved = localStorage.getItem("bikestore_cart");
-        return saved ? JSON.parse(saved) : [];
-    });
-    useEffect(() => {
-        localStorage.setItem("bikestore_cart", JSON.stringify(items));
-    }, [items]);
-    const addItem = (product, qty = 1, selectedSize = "M") => {
-        if (product.stock <= 0) {
-            return { success: false, message: `El producto ${product.name} se encuentra agotado.` };
-        }
-        const existing = items.find((i) => i.id === product.id);
-        if (existing) {
-            const desired = existing.qty + qty;
-            if (desired > product.stock) {
-                setItems((prev) => prev.map((i) => (i.id === product.id ? { ...i, qty: product.stock } : i)));
-                return {
-                    success: true,
-                    message: `Has alcanzado el límite de existencias (${product.stock} unidades disponibles).`,
-                };
-            }
-            setItems((prev) => prev.map((i) => (i.id === product.id ? { ...i, qty: desired } : i)));
-            return { success: true, message: `Cantidad actualizada en el carrito (${desired}).` };
-        }
-        const actualQty = Math.min(qty, product.stock);
-        setItems((prev) => [
-            ...prev,
-            {
-                ...product,
-                qty: actualQty,
-                selectedSize: product.sizes ? selectedSize : undefined,
-            },
-        ]);
-        return { success: true, message: `${product.name} agregado al carrito.` };
-    };
-    const updateQty = (id, delta) => {
-        const target = items.find((i) => i.id === id);
-        if (!target)
-            return { success: false };
-        const newQty = target.qty + delta;
-        if (newQty <= 0) {
-            removeItem(id);
-            return { success: true, message: "Producto removido del carrito." };
-        }
-        if (newQty > target.stock) {
-            return {
-                success: false,
-                message: `Máximo disponible en bodega: ${target.stock} unidades.`,
-            };
-        }
-        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty: newQty } : i)));
-        return { success: true };
-    };
-    const removeItem = (id) => {
-        setItems((prev) => prev.filter((i) => i.id !== id));
-    };
-    const clearCart = () => {
-        setItems([]);
-    };
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-    // Regla comercial: Envío gratis a partir de $300.000 COP
-    const shipping = subtotal > 0 && subtotal < 300000 ? 15000 : 0;
-    const tax = Math.round(subtotal * 0.19);
-    const total = subtotal + shipping;
-    const cartCount = items.reduce((sum, item) => sum + item.qty, 0);
-    return (<CartContext.Provider value={{
-            items,
-            addItem,
-            updateQty,
-            removeItem,
-            clearCart,
-            subtotal,
-            tax,
-            shipping,
-            total,
-            cartCount,
-        }}>
+  const { currentUser, token, isReady: authReady } = useAuth();
+  const [guestKey] = useState(getGuestKey);
+  const [items, setItems] = useState(() => {
+    const saved = localStorage.getItem("bikestore_cart");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [cartError, setCartError] = useState("");
+
+  const syncCart = async () => {
+    if (!authReady) return;
+    if (token) await apiRequest("/cart/claim", { method: "POST", token, guestKey });
+    const { data } = await apiRequest("/cart", { token, guestKey });
+    setItems(data);
+    setCartError("");
+  };
+
+  useEffect(() => {
+    if (authReady) {
+      syncCart().catch((error) => setCartError(error.message));
+    }
+  }, [authReady, token, currentUser?.id]);
+
+  useEffect(() => {
+    localStorage.setItem("bikestore_cart", JSON.stringify(items));
+  }, [items]);
+
+  const addItem = async (product, quantity = 1, selectedSize) => {
+    try {
+      const { data, adjusted } = await apiRequest("/cart/items", {
+        method: "POST",
+        token,
+        guestKey,
+        body: { productId: product.id, quantity, selectedSize },
+      });
+      setItems(data);
+      setCartError("");
+      return {
+        success: true,
+        message: adjusted
+          ? `La cantidad se ajustó al stock disponible (${product.stock}).`
+          : `${product.name} agregado al carrito.`,
+      };
+    } catch (error) {
+      setCartError(error.message);
+      return { success: false, message: error.message };
+    }
+  };
+
+  const updateQty = async (id, delta) => {
+    const target = items.find((item) => item.cartItemId === id);
+    if (!target) return { success: false, message: "Producto no encontrado en el carrito." };
+    const quantity = target.qty + delta;
+    if (quantity < 1) return { success: false, message: "La cantidad mínima es una unidad." };
+    try {
+      const { data } = await apiRequest(`/cart/items/${id}`, {
+        method: "PATCH",
+        token,
+        guestKey,
+        body: { quantity },
+      });
+      setItems(data);
+      setCartError("");
+      return { success: true };
+    } catch (error) {
+      setCartError(error.message);
+      return { success: false, message: error.message };
+    }
+  };
+
+  const removeItem = async (id) => {
+    try {
+      const { data } = await apiRequest(`/cart/items/${id}`, { method: "DELETE", token, guestKey });
+      setItems(data);
+      setCartError("");
+      return { success: true };
+    } catch (error) {
+      setCartError(error.message);
+      return { success: false, message: error.message };
+    }
+  };
+
+  const clearCart = () => setItems([]);
+  const subtotal = items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
+  const shipping = subtotal > 0 && subtotal < 300000 ? 15000 : 0;
+  const tax = Math.round(subtotal * 0.19);
+  const total = subtotal + shipping;
+  const cartCount = items.reduce((sum, item) => sum + item.qty, 0);
+
+  return (
+    <CartContext.Provider
+      value={{
+        items,
+        addItem,
+        updateQty,
+        removeItem,
+        clearCart,
+        subtotal,
+        tax,
+        shipping,
+        total,
+        cartCount,
+        cartError,
+        refreshCart: syncCart,
+      }}
+    >
       {children}
-    </CartContext.Provider>);
+    </CartContext.Provider>
+  );
 };

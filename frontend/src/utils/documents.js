@@ -1,20 +1,5 @@
 import { formatCOP } from "./formatters";
 import { asset } from "../config/env";
-export function salesSummary(orders) {
-    const now = new Date();
-    const monthly = orders.filter((o) => {
-        const date = new Date(o.createdAt || "");
-        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-    });
-    const total = monthly.reduce((sum, o) => sum + o.total, 0);
-    const days = Array.from({ length: now.getDate() }, (_, i) => ({
-        label: String(i + 1),
-        total: monthly.filter((o) => new Date(o.createdAt || "").getDate() === i + 1)
-            .reduce((sum, o) => sum + o.total, 0),
-    }));
-    return { monthly, total, average: monthly.length ? total / monthly.length : 0, days,
-        period: now.toLocaleDateString("es-CO", { month: "long", year: "numeric" }) };
-}
 async function logoImage() {
     const image = new Image();
     image.src = asset("/assets/logo.png");
@@ -92,25 +77,32 @@ export async function downloadInvoice(record) {
     line("Documento informativo. No constituye factura electrónica validada por la DIAN.");
     doc.save(`BikeStore-${record.id}.pdf`);
 }
-export async function exportReport(format, orders, products, users) {
-    const summary = salesSummary(orders);
+export async function exportReport(format, report) {
+    const { period, section, sales, orderCount, averageOrder, topProducts, salesSeries, orderDetails } = report;
+    const periodLabel = period.month
+        ? `${String(period.month).padStart(2, "0")}/${period.year}`
+        : String(period.year);
+    const generatedAt = new Date();
+    const generatedText = generatedAt.toLocaleString("es-CO");
+    const chart = chartImage(salesSeries.map((point) => ({ label: point.label, total: point.sales })));
     const metrics = [
-        ["Periodo", summary.period], ["Ventas (COP)", summary.total],
-        ["Pedidos", summary.monthly.length], ["Ticket promedio (COP)", summary.average],
-        ["Productos activos", products.filter((p) => p.status === "Activo").length],
-        ["Productos agotados", products.filter((p) => p.stock === 0).length],
-        ["Usuarios activos", users.filter((u) => u.status === "Activo").length],
+        ["Periodo", periodLabel],
+        ["Categoría", section],
+        ["Ventas de productos (COP, sin envío)", sales],
+        ["Pedidos pagados", orderCount],
+        ["Promedio por pedido (COP)", averageOrder],
+        ["Generado", generatedText],
     ];
-    const chart = chartImage(summary.days);
     if (format === "PDF") {
         const { doc, line } = await pdfBase("Resumen de métricas y rendimiento");
         metrics.forEach(([key, value]) => line(`${key}: ${value}`));
-        line("Fuente: pedidos guardados en este navegador. No incluye ventas externas.");
-        line("Ventas diarias del mes (COP)");
+        line("Productos más vendidos:");
+        topProducts.forEach((product, index) => line(`${index + 1}. ${product.name} · ${product.quantity} unidades · ${formatCOP(product.sales)}`));
+        line("Ventas por día o mes (COP)");
         doc.addImage(chart, "PNG", 14, 140, 180, 54);
         doc.setFontSize(10);
-        doc.text(`Generado: ${new Date().toLocaleString("es-CO")}`, 14, 205);
-        doc.save(`BikeStore-reporte-${new Date().toISOString().slice(0, 10)}.pdf`);
+        doc.text(`Generado: ${generatedText}`, 14, 205);
+        doc.save(`BikeStore-reporte-${generatedAt.toISOString().slice(0, 10)}.pdf`);
         return;
     }
     const { Workbook } = await import("exceljs");
@@ -125,16 +117,30 @@ export async function exportReport(format, orders, products, users) {
     sheet.getRow(1).height = Math.max(65, 150 / logo.ratio);
     sheet.addRow(["BIKESTORE · MÉTRICAS Y RENDIMIENTO"]);
     metrics.forEach((row) => sheet.addRow(row));
-    sheet.addRow(["Fuente: pedidos locales de este navegador"]);
+    sheet.addRow(["Valores de ventas calculados con pedidos pagados en MySQL"]);
+    sheet.addRow([]);
+    sheet.addRow(["Productos más vendidos", "Unidades", "Ventas COP"]);
+    topProducts.forEach((product) => sheet.addRow([product.name, product.quantity, product.sales]));
     sheet.addImage(workbook.addImage({ base64: chart, extension: "png" }), {
         tl: { col: 0, row: 16 }, ext: { width: 700, height: 210 },
     });
-    const daily = workbook.addWorksheet("Ventas diarias");
-    daily.addRow(["Día", "Ventas COP"]);
-    summary.days.forEach((d) => daily.addRow([Number(d.label), d.total]));
-    const detail = workbook.addWorksheet("Pedidos del mes");
-    detail.addRow(["Referencia", "Fecha", "Cliente", "Subtotal COP", "Envío COP", "Total COP", "Estado"]);
-    summary.monthly.forEach((o) => detail.addRow([o.id, o.date, o.customerName, o.subtotal, o.shipping ?? o.total - o.subtotal, o.total, o.status]));
+    const daily = workbook.addWorksheet("Ventas por periodo");
+    daily.addRow(["Día / mes", "Ventas COP"]);
+    salesSeries.forEach((point) => daily.addRow([point.label, point.sales]));
+    const detail = workbook.addWorksheet("Detalle de pedidos");
+    detail.addRow(["Referencia", "Fecha", "Cliente", "Correo", "Producto", "Cantidad", "Precio unitario COP", "Sección", "Categoría", "Total línea COP"]);
+    orderDetails.forEach((row) => detail.addRow([
+        row.orderNumber,
+        new Date(row.createdAt).toLocaleString("es-CO"),
+        row.customerName,
+        row.email,
+        row.productName,
+        Number(row.quantity),
+        Number(row.unitPrice),
+        row.section,
+        row.category,
+        Number(row.quantity) * Number(row.unitPrice),
+    ]));
     workbook.eachSheet((s) => {
         if (s !== sheet)
             s.columns.forEach((c) => { c.width = 25; });
@@ -146,7 +152,7 @@ export async function exportReport(format, orders, products, users) {
     const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `BikeStore-reporte-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    link.download = `BikeStore-reporte-${generatedAt.toISOString().slice(0, 10)}.xlsx`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

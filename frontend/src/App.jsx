@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { initialProducts } from "./data/products";
 import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./hooks/useAuth";
 import { CartProvider } from "./context/CartContext";
@@ -19,36 +18,50 @@ import AuthPage from "./pages/AuthPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import PerfilPage from "./pages/perfilpage";
 import "./assets/styles.css";
+import { apiRequest } from "./utils/api";
 function AppContent() {
     const [currentPage, setCurrentPage] = useState("home");
-    const [products, setProducts] = useState(() => {
-        const catalogVersion = localStorage.getItem("bikestore_catalog_version");
-        const saved = localStorage.getItem("bikestore_catalog_products");
-        return saved && catalogVersion === "2" ? JSON.parse(saved) : initialProducts;
-    });
+    const [products, setProducts] = useState([]);
+    const [catalogError, setCatalogError] = useState("");
     const [checkoutAfterAuth, setCheckoutAfterAuth] = useState(false);
     // Producto seleccionado para el detalle dinámico (CU-02)
-    const [selectedProduct, setSelectedProduct] = useState(products[0]);
+    const [selectedProduct, setSelectedProduct] = useState(null);
     // Último pedido completado para la pantalla de éxito (CU-08, RF-10)
     const [completedOrder, setCompletedOrder] = useState(null);
-    const [orders, setOrders] = useState(() => {
-        const saved = localStorage.getItem("bikestore_orders");
-        return saved ? JSON.parse(saved) : [];
-    });
-    useEffect(() => {
-        localStorage.setItem("bikestore_orders", JSON.stringify(orders));
-    }, [orders]);
+    const [orders, setOrders] = useState([]);
     // Modales interactivos
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     // Toast reactivo
     const [toastMessage, setToastMessage] = useState("");
     const [toastAction, setToastAction] = useState(null);
-    const { addItem } = useCart();
-    const { currentUser } = useAuth();
+    const { addItem, cartError } = useCart();
+    const { currentUser, token, isReady } = useAuth();
     useEffect(() => {
-        localStorage.setItem("bikestore_catalog_products", JSON.stringify(products));
-        localStorage.setItem("bikestore_catalog_version", "2");
-    }, [products]);
+        apiRequest(currentUser?.role === "admin" ? "/products/manage" : "/products", {
+            token: currentUser?.role === "admin" ? token : undefined,
+        })
+            .then(({ data }) => {
+                setProducts(data);
+                setCatalogError("");
+                if (!selectedProduct && data.length) setSelectedProduct(data[0]);
+            })
+            .catch((error) => setCatalogError(error.message));
+    }, [currentUser?.role, token]);
+
+    useEffect(() => {
+        if (token && currentUser?.role !== "admin") {
+            apiRequest("/orders/mine", { token })
+                .then(({ data }) => setOrders(data))
+                .catch((error) => showToast(error.message));
+        } else {
+            setOrders([]);
+        }
+    }, [token, currentUser?.role]);
+
+    useEffect(() => {
+        if (cartError) showToast(cartError);
+    }, [cartError]);
+
     const showToast = (message, action) => {
         setToastMessage(message);
         setToastAction(action || null);
@@ -58,10 +71,12 @@ function AppContent() {
         }, 4000);
     };
     const handleNavigate = (page) => {
-        if (page === "checkout" && !currentUser) {
+        if (page === "checkout" && (!currentUser || currentUser.role !== "cliente")) {
             setCheckoutAfterAuth(true);
             setCurrentPage("login");
-            showToast("Para confirmar tu compra debes iniciar sesión. Te llevamos al acceso seguro.");
+            showToast(currentUser
+                ? "Solo los clientes pueden finalizar una compra."
+                : "Para confirmar tu compra debes iniciar sesión. Te llevamos al acceso seguro.");
             window.scrollTo({ top: 0, behavior: "smooth" });
             return;
         }
@@ -82,7 +97,7 @@ function AppContent() {
         handleNavigate("product");
     };
     const handleAddToCart = (product, qty = 1, selectedSize) => {
-        const result = addItem(product, qty, selectedSize);
+        addItem(product, qty, selectedSize).then((result) => {
         if (result.success) {
             showToast(result.message, {
                 label: "Ver Carrito",
@@ -92,26 +107,47 @@ function AppContent() {
         else {
             showToast(result.message);
         }
-    };
-    // Guardar o actualizar producto desde el Admin (CU-09, CU-11)
-    const handleSaveProduct = (productData) => {
-        setProducts((prev) => {
-            const exists = prev.some((p) => p.id === productData.id);
-            if (exists) {
-                return prev.map((p) => (p.id === productData.id ? { ...p, ...productData } : p));
-            }
-            return [productData, ...prev];
         });
     };
-    // Inactivar producto con justificación obligatoria (CU-12)
-    const handleDeactivateProduct = (productId, reason) => {
-        setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, status: "Inactivo", inactivationReason: reason } : p));
+    // Guardar o actualizar producto desde el Admin (CU-09, CU-11)
+    const handleSaveProduct = async (productData) => {
+        const editing = products.some((product) => product.id === productData.id);
+        const { imageFile, ...fields } = productData;
+        let body = fields;
+        if (imageFile) {
+            body = new FormData();
+            for (const [key, value] of Object.entries(fields)) {
+                if (value !== undefined && value !== null) {
+                    body.append(key, typeof value === "object" ? JSON.stringify(value) : String(value));
+                }
+            }
+            body.append("image", imageFile);
+        }
+        const { data } = await apiRequest(editing ? `/products/${productData.id}` : "/products", {
+            method: editing ? "PUT" : "POST",
+            token,
+            body,
+        });
+        setProducts((prev) => editing
+            ? prev.map((product) => product.id === data.id ? data : product)
+            : [data, ...prev]);
+        return data;
     };
+    // Inactivar producto con justificación obligatoria (CU-12)
+    const handleDeactivateProduct = async (productId, reason) => {
+        const { data } = await apiRequest(`/products/${productId}/deactivate`, {
+            method: "PATCH",
+            token,
+            body: { reason },
+        });
+        setProducts((prev) => prev.map((product) => product.id === data.id ? data : product));
+    };
+    if (!isReady) return <main className="api-state">Validando la sesión...</main>;
     return (<MainLayout currentPage={currentPage} onNavigate={handleNavigate} onOpenSearch={() => setIsSearchOpen(true)}>
       {/* Vistas según la página activa */}
-      {currentPage === "home" && (<HomePage products={products} onAddToCart={(p) => handleAddToCart(p, 1)} onSelectProduct={handleSelectProduct}/>)}
+      {currentPage === "home" && (<HomePage products={products} error={catalogError} onAddToCart={(p) => handleAddToCart(p, 1)} onSelectProduct={handleSelectProduct}/>)}
 
-      {currentPage === "product" && (<ProductDetailPage product={selectedProduct} onAddToCart={handleAddToCart} onNavigate={handleNavigate}/>)}
+      {currentPage === "product" && selectedProduct && (<ProductDetailPage product={selectedProduct} onAddToCart={handleAddToCart} onNavigate={handleNavigate}/>)}
 
       {currentPage === "cart" && <CartPage onNavigate={handleNavigate}/>}
 

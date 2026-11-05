@@ -7,16 +7,20 @@ export const ProductDeactivateModal = ({ isOpen, product, onClose, onConfirm, })
     const [error, setError] = useState("");
     if (!isOpen || !product)
         return null;
-    const handleConfirm = (e) => {
+    const handleConfirm = async (e) => {
         e.preventDefault();
         if (!reason.trim()) {
             setError("El motivo de inactivación es obligatorio (Regla de negocio CU-12).");
             return;
         }
-        onConfirm(product.id, reason);
-        setReason("");
-        setError("");
-        onClose();
+        try {
+            await onConfirm(product.id, reason);
+            setReason("");
+            setError("");
+            onClose();
+        } catch (requestError) {
+            setError(requestError.message || "No fue posible inactivar el producto.");
+        }
     };
     return (<div role="dialog" aria-modal="true" className="product-deactivate-modal-div-1" onClick={onClose}>
       <div className="product-deactivate-modal-div-2" onClick={(e) => e.stopPropagation()}>

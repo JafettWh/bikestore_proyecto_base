@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { exportReport, salesSummary } from "../utils/documents";
+import React, { useState, useMemo, useEffect } from "react";
+import { exportReport } from "../utils/documents";
 import { useAuth } from "../hooks/useAuth";
 import { formatCOP } from "../utils/formatters";
 import Logo from "../components/Logo";
@@ -11,12 +11,14 @@ import ProductFormModal from "../components/ProductFormModal";
 import ProductDeactivateModal from "../components/ProductDeactivateModal";
 import UserFormModal from "../components/UserFormModal";
 import { asset } from "../config/env";
+import { apiRequest } from "../utils/api";
 import "../assets/styles.css";
 export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onSaveProduct, onDeactivateProduct, }) => {
-    const { users = [], currentUser, logout, addUser, updateUser, deactivateUser, } = useAuth();
+    const { currentUser, logout, token, addUser, updateUser, deactivateUser, } = useAuth();
     const [activeTab, setActiveTab] = useState("dashboard");
     const [productSearch, setProductSearch] = useState("");
     const [productCategoryFilter, setProductCategoryFilter] = useState("Todas");
+    const [productStatusFilter, setProductStatusFilter] = useState("Todos");
     const [userSearch, setUserSearch] = useState("");
     const [salesChartView, setSalesChartView] = useState("days");
     const [salesChartYear, setSalesChartYear] = useState(new Date().getFullYear());
@@ -32,7 +34,11 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
     // Alerta temporal
     const [adminNotice, setAdminNotice] = useState("");
     const [isExporting, setIsExporting] = useState(false);
-    const summary = useMemo(() => salesSummary(orders), [orders]);
+    const [dashboardData, setDashboardData] = useState(null);
+    const [dashboardError, setDashboardError] = useState("");
+    const [managedProducts, setManagedProducts] = useState(products);
+    const [managedUsers, setManagedUsers] = useState([]);
+    const [userCount, setUserCount] = useState(0);
     const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, month) => ({
         value: month,
         label: new Intl.DateTimeFormat("es-CO", { month: "long" }).format(new Date(2024, month, 1)),
@@ -42,91 +48,102 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
             .format(new Date(2024, month, 1))
             .replace(".", ""),
     })), []);
-    const salesYears = useMemo(() => Array.from(new Set([
-        new Date().getFullYear(),
-        ...orders
-            .map((order) => new Date(order.createdAt || "").getFullYear())
-            .filter((year) => !Number.isNaN(year)),
-    ])).sort((a, b) => b - a), [orders]);
-    const productSectionById = useMemo(() => new Map(products.map((product) => [product.id, product.section])), [products]);
-    const salesChartData = useMemo(() => {
-        const pointCount = salesChartView === "days"
-            ? new Date(salesChartYear, salesChartMonth + 1, 0).getDate()
-            : 12;
-        return Array.from({ length: pointCount }, (_, index) => {
-            const total = orders.reduce((sum, order) => {
-                const orderDate = new Date(order.createdAt || "");
-                const matchesPeriod = orderDate.getFullYear() === salesChartYear &&
-                    (salesChartView === "months" ||
-                        orderDate.getMonth() === salesChartMonth) &&
-                    (salesChartView === "days"
-                        ? orderDate.getDate() === index + 1
-                        : orderDate.getMonth() === index);
-                if (!matchesPeriod)
-                    return sum;
-                return (sum +
-                    order.items.reduce((itemSum, item) => {
-                        const matchesCategory = salesCategory === "Todas" ||
-                            productSectionById.get(item.id) === salesCategory;
-                        return matchesCategory ? itemSum + item.price * item.qty : itemSum;
-                    }, 0));
-            }, 0);
-            return {
-                label: salesChartView === "days"
-                    ? String(index + 1)
-                    : monthOptions[index].shortLabel,
-                total,
-            };
-        });
-    }, [
-        monthOptions,
-        orders,
-        productSectionById,
-        salesCategory,
-        salesChartMonth,
-        salesChartView,
-        salesChartYear,
-    ]);
+    const salesYears = [new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2];
+    const salesChartData = (dashboardData?.salesSeries || []).map((point) => ({
+        label: salesChartView === "months" ? monthOptions[Number(point.label) - 1]?.shortLabel || point.label : point.label,
+        total: point.sales,
+    }));
     const maxChartSales = Math.max(1, ...salesChartData.map((point) => point.total));
     const showNotice = (msg) => {
         setAdminNotice(msg);
         setTimeout(() => setAdminNotice(""), 3500);
     };
+    const refreshAdminUsers = async () => {
+        const { data } = await apiRequest("/admin/users", { token });
+        setManagedUsers(data);
+        setUserCount(data.length);
+        return data;
+    };
     const handleLogout = () => {
         logout();
         onNavigate("home");
     };
-    // Filtrado de productos
-    const filteredProducts = useMemo(() => {
-        const list = products || [];
-        return list.filter((p) => {
-            const matchesSearch = p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-                p.category.toLowerCase().includes(productSearch.toLowerCase());
-            const matchesCategory = productCategoryFilter === "Todas" || p.section === productCategoryFilter;
-            return matchesSearch && matchesCategory;
+    const summary = {
+        total: dashboardData?.sales || 0,
+        orderCount: dashboardData?.orderCount || 0,
+        average: dashboardData?.averageOrder || 0,
+        period: dashboardData?.period?.month
+            ? `${monthOptions[dashboardData.period.month - 1].label} ${dashboardData.period.year}`
+            : String(dashboardData?.period?.year || salesChartYear),
+    };
+    const filteredProducts = managedProducts;
+    const filteredUsers = managedUsers;
+    const safeUsers = managedUsers;
+
+    useEffect(() => {
+        const query = new URLSearchParams({
+            year: String(salesChartYear),
+            view: salesChartView,
+            section: salesCategory,
+            ...(salesChartView === "days" ? { month: String(salesChartMonth + 1) } : {}),
         });
-    }, [products, productSearch, productCategoryFilter]);
-    // Filtrado de usuarios
-    const filteredUsers = useMemo(() => {
-        const list = users || [];
-        return list.filter((u) => (u.name && u.name.toLowerCase().includes(userSearch.toLowerCase())) ||
-            (u.email && u.email.toLowerCase().includes(userSearch.toLowerCase())) ||
-            (u.role && u.role.toLowerCase().includes(userSearch.toLowerCase())));
-    }, [users, userSearch]);
+        apiRequest(`/admin/dashboard?${query}`, { token })
+            .then(({ data }) => {
+                setDashboardData(data);
+                setDashboardError("");
+            })
+            .catch((error) => setDashboardError(error.message));
+    }, [token, salesChartYear, salesChartMonth, salesChartView, salesCategory]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const query = new URLSearchParams();
+            if (productSearch.trim()) query.set("search", productSearch.trim());
+            if (productCategoryFilter !== "Todas") query.set("section", productCategoryFilter);
+            if (productStatusFilter !== "Todos") query.set("status", productStatusFilter);
+            apiRequest(`/products/manage${query.size ? `?${query}` : ""}`, { token })
+                .then(({ data }) => setManagedProducts(data))
+                .catch((error) => showNotice(error.message));
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [token, productSearch, productCategoryFilter, productStatusFilter]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const query = new URLSearchParams();
+            if (userSearch.trim()) query.set("search", userSearch.trim());
+            apiRequest(`/admin/users${query.size ? `?${query}` : ""}`, { token })
+                .then(({ data }) => {
+                    setManagedUsers(data);
+                    if (!userSearch.trim()) setUserCount(data.length);
+                })
+                .catch((error) => showNotice(error.message));
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [token, userSearch]);
+
     const handleExportReport = async (format) => {
         setIsExporting(true);
         try {
-            await exportReport(format, orders, products, users);
+            const query = new URLSearchParams({
+                year: String(salesChartYear),
+                view: salesChartView,
+                section: salesCategory,
+                ...(salesChartView === "days" ? { month: String(salesChartMonth + 1) } : {}),
+            });
+            const { data } = await apiRequest(`/admin/dashboard/export?${query}`, { token });
+            if (!data.sales && !data.orderCount) {
+                throw new Error("No hay ventas para exportar en el periodo seleccionado.");
+            }
+            await exportReport(format, data);
             showNotice(`Informe ${format} generado. Descarga iniciada.`);
-        }
-        catch {
-            showNotice("No se pudo generar el informe. Intenta nuevamente.");
+        } catch (error) {
+            showNotice(error.message || "No se pudo generar el informe. Intenta nuevamente.");
         }
         finally {
             setIsExporting(false);
         }
     };
-    const safeUsers = users || [];
     return (<div className="admin-dashboard-div-1">
       {/* SIDEBAR ADMINISTRATIVO CORREGIDO */}
       <aside className="admin-dashboard-aside-1">
@@ -238,10 +255,12 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
         {/* PESTAÑA 1: DASHBOARD */}
         {activeTab === "dashboard" && (<div className="admin-dashboard-div-10">
             <div className="admin-dashboard-div-11">
-              <MetricCard title="Ventas Totales del Mes" value={formatCOP(summary.total)} subtext={`Pedidos locales · ${summary.period}`} iconName="sparkles"/>
-              <MetricCard title="Cantidad de Pedidos" value={String(summary.monthly.length)} subtext="Pedidos registrados este mes en este navegador" iconName="cart"/>
-              <MetricCard title="Ticket Promedio por Cliente" value={formatCOP(summary.average)} subtext="Promedio por pedido del mes" iconName="shield"/>
+              <MetricCard title="Ventas Totales del Periodo" value={formatCOP(summary.total)} subtext={`Pedidos pagados · ${summary.period}`} iconName="sparkles"/>
+              <MetricCard title="Cantidad de Pedidos" value={String(summary.orderCount)} subtext="Pedidos pagados en MySQL" iconName="cart"/>
+              <MetricCard title="Ticket Promedio por Pedido" value={formatCOP(summary.average)} subtext="Promedio de ventas del periodo" iconName="shield"/>
             </div>
+
+            {dashboardError && <p className="admin-dashboard-error" role="alert">{dashboardError}</p>}
 
             <div className="admin-dashboard-div-12">
               <span className="admin-dashboard-span-6">
@@ -253,7 +272,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                 </h4>
                 <ul className="admin-dashboard-ul-1">
                   <li>
-                    <strong>Inventario:</strong> {products.filter((p) => p.stock === 0).length} productos sin existencias.
+                    <strong>Inventario:</strong> {dashboardData?.outOfStockCount ?? 0} productos activos sin existencias.
                   </li>
                 </ul>
               </div>
@@ -268,12 +287,9 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                 : "Ventas mensuales del año"}{" "}
                     (COP)
                   </h3>
-                  <p className="admin-dashboard-p-1">
-                    Valor de los productos vendidos, sin incluir envío. Datos
-                    registrados en este navegador.
-                  </p>
+                  <p className="admin-dashboard-p-1">Valor de productos vendidos, sin incluir envío, consultado desde MySQL.</p>
                 </div>
-                <Badge variant="yellow">Datos locales</Badge>
+                <Badge variant="yellow">Datos de MySQL</Badge>
               </div>
 
               <div className="admin-dashboard-div-16">
@@ -378,6 +394,20 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
               </p>
             </div>
 
+            <section className="admin-dashboard-top-products">
+              <h3>Productos más vendidos</h3>
+              {dashboardData?.topProducts?.length ? (
+                <ol>
+                  {dashboardData.topProducts.map((product) => (
+                    <li key={product.id}>
+                      <span>{product.name}</span>
+                      <strong>{product.quantity} unidades · {formatCOP(product.sales)}</strong>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p>No hay ventas para el periodo seleccionado.</p>}
+            </section>
+
           </div>)}
 
         {/* PESTAÑA 2: PRODUCTOS */}
@@ -390,6 +420,11 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                   <option value="Bicicletas">Bicicletas</option>
                   <option value="Componentes">Componentes</option>
                   <option value="Accesorios">Accesorios</option>
+                </select>
+                <select value={productStatusFilter} onChange={(e) => setProductStatusFilter(e.target.value)} className="admin-dashboard-select-3" aria-label="Filtrar por estado">
+                  <option value="Todos">Todos los estados</option>
+                  <option value="Activo">Activos</option>
+                  <option value="Inactivo">Inactivos</option>
                 </select>
               </div>
 
@@ -450,12 +485,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                         <span>·</span>
                         {p.status === "Activo" ? (<button type="button" onClick={() => setProductToDeactivate(p)} className="admin-dashboard-button-7">
                             Inactivar
-                          </button>) : (<button type="button" onClick={() => {
-                        onSaveProduct({ ...p, status: "Activo" });
-                        showNotice(`Producto ${p.name} reactivado en catálogo.`);
-                    }} className="admin-dashboard-button-8">
-                            Reactivar
-                          </button>)}
+                          </button>) : <span className="admin-dashboard-button-8">Sin reactivación</span>}
                       </td>
                     </tr>))}
                 </tbody>
@@ -471,7 +501,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                   Total Usuarios Registrados
                 </span>
                 <span className="admin-dashboard-span-14">
-                  {safeUsers.length}
+                  {userCount}
                 </span>
               </div>
               <div className="admin-dashboard-div-36">
@@ -539,22 +569,18 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                             Editar Usuario
                           </button>
                           <span>·</span>
-                          {u.status === "Activo" ? (<button type="button" onClick={() => {
-                        const res = deactivateUser(u.id);
-                        if (res && res.success) {
+                          {u.status === "Activo" ? (<button type="button" onClick={async () => {
+                        if (!window.confirm(`¿Inactivar la cuenta de ${u.name}?`)) return;
+                        const res = await deactivateUser(u.id);
+                        if (res.success) {
                             showNotice(res.message);
-                        }
-                        else if (res) {
-                            alert(res.message);
+                            setManagedUsers((previous) => previous.map((user) => user.id === u.id ? { ...user, status: "Inactivo" } : user));
+                        } else {
+                            showNotice(res.message);
                         }
                     }} className="admin-dashboard-button-7">
                               Inactivar Cuenta
-                            </button>) : (<button type="button" onClick={() => {
-                        updateUser(u.id, { status: "Activo" });
-                        showNotice(`Cuenta de ${u.name} activada.`);
-                    }} className="admin-dashboard-button-8">
-                              Reactivar Cuenta
-                            </button>)}
+                            </button>) : <span className="admin-dashboard-button-8">Cuenta inactiva</span>}
                         </td>
                       </tr>))}
                   </tbody>
@@ -565,35 +591,44 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
       </main>
 
       {/* MODALES */}
-      <ProductFormModal isOpen={isProductModalOpen} productToEdit={productToEdit} onClose={() => setIsProductModalOpen(false)} onSave={(data) => {
-            onSaveProduct(data);
+      <ProductFormModal isOpen={isProductModalOpen} productToEdit={productToEdit} onClose={() => setIsProductModalOpen(false)} onSave={async (data) => {
+            await onSaveProduct(data);
+            setManagedProducts((previous) => {
+                const exists = previous.some((product) => product.id === data.id);
+                return exists ? previous.map((product) => product.id === data.id ? { ...product, ...data } : product) : [{ ...data, status: "Activo" }, ...previous];
+            });
             showNotice(productToEdit
                 ? `Producto ${data.name} actualizado exitosamente.`
                 : `Producto ${data.name} registrado en catálogo.`);
         }}/>
 
-      <ProductDeactivateModal isOpen={!!productToDeactivate} product={productToDeactivate} onClose={() => setProductToDeactivate(null)} onConfirm={(id, reason) => {
-            onDeactivateProduct(id, reason);
+      <ProductDeactivateModal isOpen={!!productToDeactivate} product={productToDeactivate} onClose={() => setProductToDeactivate(null)} onConfirm={async (id, reason) => {
+            await onDeactivateProduct(id, reason);
+            setManagedProducts((previous) => previous.map((product) => product.id === id ? { ...product, status: "Inactivo", inactivationReason: reason } : product));
             showNotice("Producto retirado del catálogo público con justificación registrada.");
         }}/>
 
-      <UserFormModal isOpen={isUserModalOpen} userToEdit={userToEdit} onClose={() => setIsUserModalOpen(false)} onSave={(data) => {
+      <UserFormModal isOpen={isUserModalOpen} userToEdit={userToEdit} onClose={() => setIsUserModalOpen(false)} onSave={async (data) => {
             if (userToEdit) {
-                const res = updateUser(userToEdit.id, data);
+                const res = await updateUser(userToEdit.id, data);
                 if (res && res.success) {
                     showNotice(res.message);
+                    await refreshAdminUsers();
+                    return true;
                 }
                 else if (res) {
-                    alert(res.message);
+                    return res;
                 }
             }
             else {
-                const res = addUser(data);
+                const res = await addUser(data);
                 if (res && res.success) {
                     showNotice(res.message);
+                    await refreshAdminUsers();
+                    return true;
                 }
                 else if (res) {
-                    alert(res.message);
+                    return res;
                 }
             }
         }}/>

@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { useCart } from "../hooks/useCart";
 import { useAuth } from "../hooks/useAuth";
-import { formatCOP, generateOrderId } from "../utils/formatters";
+import { formatCOP } from "../utils/formatters";
 import Icon from "../components/Icon";
 import Button from "../components/Button";
 import Input from "../components/Input";
 import { asset } from "../config/env";
+import { apiRequest } from "../utils/api";
 import "../assets/styles.css";
 // Departamentos de Colombia con ciudades y municipios principales
 const departamentosColombia = {
@@ -32,27 +33,26 @@ const departamentosColombia = {
 };
 export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
     const { items, subtotal, tax, shipping, total, clearCart } = useCart();
-    const { currentUser } = useAuth();
-    const [name, setName] = useState(currentUser?.name || "Beatriz Mendoza");
-    const [email, setEmail] = useState(currentUser?.email || "beatriz.m@gmail.com");
-    const [address, setAddress] = useState("Calle 15 #28-40, Barrio San Pedro");
+    const { token } = useAuth();
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [address, setAddress] = useState("");
     const [phone, setPhone] = useState("");
-    const [department, setDepartment] = useState("Valle del Cauca");
-    const [city, setCity] = useState("Palmira");
+    const [department, setDepartment] = useState("");
+    const [city, setCity] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("card");
     const [isProcessing, setIsProcessing] = useState(false);
+    const [checkoutError, setCheckoutError] = useState("");
     // Datos simulados de tarjeta
-    const [cardNumber, setCardNumber] = useState("4532 •••• •••• 8912");
-    const [expiry, setExpiry] = useState("12 / 28");
-    const [cvv, setCvv] = useState("892");
+    const [cardNumber, setCardNumber] = useState("");
+    const [expiry, setExpiry] = useState("");
+    const [cvv, setCvv] = useState("");
+    const [bankName, setBankName] = useState("");
     // Lista de ciudades dinámicas según departamento
-    const availableCities = departamentosColombia[department] || ["Ciudad Principal"];
+    const availableCities = departamentosColombia[department] || [];
     const handleDepartmentChange = (newDept) => {
         setDepartment(newDept);
-        const cities = departamentosColombia[newDept] || [];
-        if (cities.length > 0) {
-            setCity(cities[0]);
-        }
+        setCity("");
     };
     // Si no hay productos en el carrito
     if (items.length === 0) {
@@ -69,39 +69,36 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
         </Button>
       </main>);
     }
-    const handleCheckout = (e) => {
+    const handleCheckout = async (e) => {
         e.preventDefault();
+        setCheckoutError("");
         setIsProcessing(true);
-        setTimeout(() => {
-            const newOrder = {
-                id: generateOrderId(),
-                customerName: name,
-                email,
-                address,
-                phone,
-                shipping,
-                createdAt: new Date().toISOString(),
-                city: `${city}, ${department}`,
-                paymentMethod,
-                items: items.map((i) => ({
-                    id: i.id,
-                    name: i.name,
-                    price: i.price,
-                    qty: i.qty,
-                    image: i.image,
-                    selectedSize: i.selectedSize,
-                })),
-                subtotal,
-                tax,
-                total,
-                status: "Pagado",
-                date: new Date().toLocaleString("es-CO"),
-            };
+        try {
+            const { data: newOrder } = await apiRequest("/orders", {
+                method: "POST",
+                token,
+                body: {
+                    name,
+                    email,
+                    address,
+                    phone,
+                    department,
+                    city,
+                    paymentMethod,
+                    cardNumber,
+                    expiry,
+                    cvv,
+                    bankName,
+                },
+            });
             clearCart();
-            setIsProcessing(false);
             onOrderCompleted(newOrder);
             onNavigate("success");
-        }, 1200);
+        } catch (error) {
+            setCheckoutError(error.message);
+        } finally {
+            setIsProcessing(false);
+        }
     };
     return (<main className="checkout-main-2">
       <div className="checkout-div-1">
@@ -114,6 +111,7 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
         <p className="checkout-p-2">
           Entrega rápida a domicilio a nivel nacional y pago protegido con cifrado bancario.
         </p>
+        {checkoutError && <p className="checkout-error" role="alert">{checkoutError}</p>}
       </div>
 
       <div className="checkout-div-2">
@@ -138,6 +136,7 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
                   Departamento *
                 </label>
                 <select value={department} onChange={(e) => handleDepartmentChange(e.target.value)} className="checkout-select-1">
+                  <option value="">Selecciona un departamento</option>
                   {Object.keys(departamentosColombia).map((dept) => (<option key={dept} value={dept}>
                       {dept}
                     </option>))}
@@ -149,12 +148,12 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
                 <label className="checkout-label-1">
                   Ciudad o Municipio *
                 </label>
-                <input type="text" required list="ciudades-list" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Escribe o selecciona tu ciudad" className="checkout-input-1"/>
+                <input type="text" required list="ciudades-list" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ciudad o municipio" className="checkout-input-1"/>
                 <datalist id="ciudades-list">
                   {availableCities.map((c) => (<option key={c} value={c}/>))}
                 </datalist>
                 <span className="checkout-span-3">
-                  Sugerencias para {department}: {availableCities.slice(0, 4).join(", ")}...
+                  {availableCities.length ? `Opciones: ${availableCities.slice(0, 4).join(", ")}` : "Selecciona primero un departamento."}
                 </span>
               </div>
 
@@ -194,10 +193,10 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
 
             {paymentMethod === "card" ? (<div className="checkout-div-7">
                 <div className="checkout-div-8">
-                  <Input label="Número de Tarjeta" required value={cardNumber} onChange={(e) => setCardNumber(e.target.value)}/>
+                  <Input label="Número de Tarjeta (simulado)" required inputMode="numeric" placeholder="Ingresa datos de prueba; no uses una tarjeta real" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)}/>
                 </div>
                 <Input label="Vencimiento" required placeholder="MM / AA" value={expiry} onChange={(e) => setExpiry(e.target.value)}/>
-                <Input label="CVV / CVC" required type="password" placeholder="•••" value={cvv} onChange={(e) => setCvv(e.target.value)}/>
+                <Input label="CVV / CVC (simulado)" required type="password" placeholder="Código de prueba" value={cvv} onChange={(e) => setCvv(e.target.value)}/>
                 <div className="checkout-div-9">
                   <span className="checkout-span-4">
                     <Icon name="check" size={13}/> Pasarela Aprobada
@@ -211,7 +210,8 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
                   <label className="checkout-label-2">
                     Selecciona tu Banco:
                   </label>
-                  <select className="checkout-select-2">
+                  <select required value={bankName} onChange={(e) => setBankName(e.target.value)} className="checkout-select-2">
+                    <option value="">Selecciona un banco</option>
                     <option>Bancolombia</option>
                     <option>Davivienda</option>
                     <option>Nequi / Daviplata</option>
@@ -235,7 +235,7 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
           </h3>
 
           <div className="checkout-div-11">
-            {items.map((item) => (<div key={item.id} className="checkout-div-12">
+            {items.map((item) => (<div key={item.cartItemId} className="checkout-div-12">
                 <img src={asset(item.image)} alt={item.name} className="checkout-img-1"/>
                 <div className="checkout-div-13">
                   <h4 className="checkout-h4-1">

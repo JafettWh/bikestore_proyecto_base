@@ -1902,3 +1902,111 @@ input[class*="input-input-3"] {
   padding-right: 44px !important;
 }
 
+input,
+select,
+textarea {
+  border-radius: 5px !important;
+}
+
+[class*="card"],
+[role="dialog"],
+[role="dialog"] > div,
+[class*="modal-container"],
+[class*="modal-div-2"],
+[class*="checkout-section"],
+[class*="checkout-aside"],
+article,
+aside,
+.summary,
+.empty,
+.shipping-note {
+  border-radius: 5px;
+}
+
+.product-card {
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.auth-terms {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.auth-terms-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  line-height: 1.5;
+}
+
+.auth-terms-label input {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--yellow);
+}
+
+.catalog-error,
+.checkout-error,
+.admin-dashboard-error {
+  max-width: 1400px;
+  margin: 18px auto;
+  padding: 12px 16px;
+  border: 1px solid #efc8c8;
+  border-radius: 5px;
+  background: #fff5f5;
+  color: #8d2929;
+  font-size: 13px;
+}
+
+.api-state {
+  min-height: 40vh;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+
+.admin-dashboard-top-products {
+  margin-top: 24px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+}
+
+.admin-dashboard-top-products h3 {
+  margin: 0 0 14px;
+  font: 700 22px "Barlow Condensed";
+  text-transform: uppercase;
+}
+
+.admin-dashboard-top-products ol {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.admin-dashboard-top-products li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-dashboard-top-products li:last-child {
+  border-bottom: 0;
+}
+
+.admin-dashboard-top-products li span,
+.admin-dashboard-top-products li strong {
+  display: block;
+}
+
+.admin-dashboard-top-products li strong {
+  margin-top: 4px;
+  font-size: 12px;
+}

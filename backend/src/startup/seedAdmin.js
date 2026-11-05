@@ -2,32 +2,24 @@ const bcrypt = require('bcrypt');
 const pool = require('../config/db');
 const env = require('../config/env');
 
-async function seedAdmin() {
-    const {name, email, password} = env.admin;
+async function seedUsers() {
+    for (const seed of env.seeds) {
+        const { name, email, password, role } = seed;
+        if (!name || !email || !password) {
+            console.warn(`Seed ${role} omitido: configura SEED_${role.toUpperCase()}_NAME, EMAIL y PASSWORD`);
+            continue;
+        }
+        const [existing] = await pool.execute('SELECT id FROM users WHERE email = ?', [email.trim().toLowerCase()]);
+        if (existing.length) continue;
 
-    if (!name || !email || !password) {
-        console.error('Seed de admin omitido: ADMIN_NAME/ADMIN_EMAIL/ADMIN_PASSWORD no están configurados');
-        return;
+        const passwordHash = await bcrypt.hash(password, 12);
+        await pool.execute(
+            `INSERT INTO users (role_id, name, email, password_hash, status)
+             SELECT id, ?, ?, ?, 'active' FROM roles WHERE name = ?`,
+            [name.trim(), email.trim().toLowerCase(), passwordHash, role]
+        );
+        console.log(`Usuario de prueba ${role} creado: ${email}`);
     }
-
-    const [existing] = await pool.execute(
-        'SELECT id_usuario FROM usuarios WHERE email = ?',
-        [email]
-    );
-
-    if (existing.length) { 
-        console.log('Seed de admin omitido: ya existe un usuario con ese email');
-        return;
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-
-    await pool.execute(
-        'INSERT INTO usuarios (nombre, email, password, rol) VALUES (?, ?, ?, ?)',
-        [name, email, hash, 'admin']
-    );
-
-    console.log(`Usuario admin creado: ${email}`);
 }
 
-module.exports = seedAdmin;
+module.exports = seedUsers;

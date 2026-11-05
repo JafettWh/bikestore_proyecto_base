@@ -1,10 +1,11 @@
 {
-  "name": "lab-crud-backend",
+  "name": "bikestore-backend",
   "version": "1.0.0",
-  "description": "Backend pedagógico CRUD + autenticación + roles",
+  "description": "API CRUD de BikeStore con autenticación, MySQL y roles",
   "keywords": [
-    "laboratorio",
-    "backend"
+    "bikestore",
+    "backend",
+    "crud"
   ],
   "license": "ISC",
   "author": "Jafet Hernández",
@@ -24,7 +25,8 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.3.0",
-    "mysql2": "^3.24.3"
+    "mysql2": "^3.24.3",
+    "nodemailer": "^10.3.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
