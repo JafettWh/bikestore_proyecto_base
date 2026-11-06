@@ -31,6 +31,8 @@ Edita `backend/.env` con el usuario/contraseña MySQL y reemplaza `JWT_SECRET` c
 
 La API escucha en `http://localhost:3000`; comprueba su estado en `GET /api/health`. En desarrollo acepta puertos locales de Vite (por ejemplo, `5173` y `5174`); en producción solo acepta los orígenes definidos en `CORS_ORIGIN`.
 
+Para probar los endpoints con Postman o RapidAPI Client, consulta la guía [Pruebas de API](../docs/Pruebas_API_Postman_RapidAPI.md), con ejemplos de autenticación, CRUD, carrito, compras y validaciones.
+
 ### Cuentas locales de prueba
 
 Las credenciales de desarrollo están en `backend/.env.example`:
