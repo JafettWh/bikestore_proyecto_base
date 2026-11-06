@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useCart } from "../hooks/useCart";
 import Icon from "../components/Icon";
 import Button from "../components/Button";
 import Input from "../components/Input";
@@ -9,6 +10,7 @@ import "../assets/styles.css";
 
 export const AuthPage = ({ mode, onNavigate, returnAfterAuth }) => {
   const { login, register } = useAuth();
+  const { refreshCart } = useCart();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -38,6 +40,12 @@ export const AuthPage = ({ mode, onNavigate, returnAfterAuth }) => {
     setIsSubmitting(false);
     if (!result.success) {
       setError(result.message);
+      return;
+    }
+    try {
+      await refreshCart(result.token, result.user?.role);
+    } catch (syncError) {
+      setError(`Sesión iniciada, pero no se pudo transferir el carrito: ${syncError.message}`);
       return;
     }
     setSuccessMsg(result.message);

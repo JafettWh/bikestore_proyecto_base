@@ -6,7 +6,7 @@ const AppError = require('../utils/AppError');
 
 const UPLOAD_DIR = path.join(__dirname, '../../uploads');
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_SIZE = 2 * 1024 * 1024;
+const MAX_SIZE = 20 * 1024 * 1024;
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 

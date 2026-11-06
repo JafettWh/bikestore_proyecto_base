@@ -29,6 +29,7 @@
 **Dirección de envío** *(RF-11; CU-08 pasos 3-4 y flujo alterno 4.1)*
 
 * El sistema debe solicitar la dirección de envío: nombre, correo, departamento, ciudad o municipio, dirección detallada y teléfono de contacto.
+* El sistema puede solicitar barrio, apartamento o indicaciones de entrega como información complementaria opcional y debe incluirla en el pedido.
 * El sistema debe validar que la dirección esté completa y, si faltan campos, mostrar un mensaje indicando los campos pendientes.
 
 **Pago simulado** *(RF-11; CU-08 pasos 4-6 y flujos alternos 6.1 y 6.2)*
@@ -110,6 +111,7 @@
 
 * [ ] Resumen del pedido con productos, cantidades y valor total
 * [ ] Formulario de dirección de envío con validación de campos completos
+* [ ] Campo opcional para barrio, apartamento o indicaciones complementarias asociado al pedido
 * [ ] Formulario de pago simulado con validación de formato y campos completos
 * [ ] Opciones de pago simulado con tarjeta y con PSE
 * [ ] Número de pedido único generado por el sistema

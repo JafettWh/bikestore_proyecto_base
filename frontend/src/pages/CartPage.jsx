@@ -67,10 +67,10 @@ export const CartPage = ({ onNavigate }) => {
                       </h3>
                       <div className="cart-div-9">
                         {item.selectedSize && <span>Talla: <strong>{item.selectedSize}</strong></span>}
-                        <span>· Stock disponible: <strong>{item.stock}</strong></span>
+                        <span>· Existencias disponibles: <strong>{item.stock}</strong></span>
                       </div>
                       <span className="cart-span-3">
-                        {formatCOP(item.price)} c/u
+                        {formatCOP(item.price)} cada uno
                       </span>
                     </div>
                   </div>
@@ -160,7 +160,7 @@ export const CartPage = ({ onNavigate }) => {
               <span>Confirmar Eliminación</span>
             </div>
             <p className="cart-p-3">
-              ¿Deseas remover <strong className="cart-span-10">{itemToDelete.name}</strong> de tu carrito de compras?
+              ¿Deseas quitar <strong className="cart-span-10">{itemToDelete.name}</strong> de tu carrito de compras?
             </p>
             <div className="cart-div-21">
               <Button variant="outline" size="sm" className="cart-button-5" onClick={() => setItemToDelete(null)}>

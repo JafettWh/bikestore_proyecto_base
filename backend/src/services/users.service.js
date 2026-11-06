@@ -29,7 +29,7 @@ async function listUsers({ search = '', status = '' } = {}) {
             u.telefono_usuario AS phone, u.direccion_detallada AS address,
             u.barrio AS neighborhood, u.ciudad AS city, u.departamento AS department,
                 u.estado_usuario AS status, u.created_at, r.nombre_rol AS role
-         FROM users u JOIN roles r ON r.id_rol = u.id_rol
+         FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
          ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
          ORDER BY u.created_at DESC`,
         params
@@ -45,8 +45,8 @@ async function createUser(data) {
     const hash = await bcrypt.hash(data.password, 12);
     try {
         const [result] = await pool.execute(
-            `INSERT INTO users (id_rol, nombre_usuario, correo_usuario, contraseña_hash, estado_usuario)
-             SELECT r.id_rol, ?, ?, ?, 'active' FROM roles r WHERE r.nombre_rol = ?`,
+            `INSERT INTO usuario (id_rol, nombre_usuario, correo_usuario, contraseña_hash, estado_usuario)
+             SELECT r.id_rol, ?, ?, ?, 'active' FROM rol r WHERE r.nombre_rol = ?`,
             [fields.name, fields.email, hash, fields.role]
         );
         return { id: result.insertId };
@@ -63,7 +63,7 @@ async function updateUser(id, data) {
         await connection.beginTransaction();
         const [users] = await connection.execute(
             `SELECT u.id_usuario AS id, u.estado_usuario AS status, r.nombre_rol AS role
-             FROM users u JOIN roles r ON r.id_rol = u.id_rol
+             FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
              WHERE u.id_usuario = ? FOR UPDATE`,
             [id]
         );
@@ -71,7 +71,7 @@ async function updateUser(id, data) {
         if (!target) throw new AppError('Usuario no encontrado', 404);
         if (target.status === 'active' && target.role === 'admin' && fields.role !== 'admin') {
             const [admins] = await connection.execute(
-                `SELECT u.id_usuario AS id FROM users u JOIN roles r ON r.id_rol = u.id_rol
+                `SELECT u.id_usuario AS id FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
                  WHERE u.estado_usuario = 'active' AND r.nombre_rol = 'admin' FOR UPDATE`
             );
             if (admins.length <= 1) {
@@ -79,7 +79,7 @@ async function updateUser(id, data) {
             }
         }
         await connection.execute(
-            `UPDATE users SET nombre_usuario = ?, correo_usuario = ?, id_rol = (SELECT id_rol FROM roles WHERE nombre_rol = ?)
+            `UPDATE usuario SET nombre_usuario = ?, correo_usuario = ?, id_rol = (SELECT id_rol FROM rol WHERE nombre_rol = ?)
              WHERE id_usuario = ?`,
             [fields.name, fields.email, fields.role, id]
         );
@@ -101,7 +101,7 @@ async function deactivateUser(id) {
         await connection.beginTransaction();
         const [users] = await connection.execute(
             `SELECT u.id_usuario AS id, u.estado_usuario AS status, r.nombre_rol AS role
-             FROM users u JOIN roles r ON r.id_rol = u.id_rol
+             FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
              WHERE u.id_usuario = ? FOR UPDATE`,
             [id]
         );
@@ -109,14 +109,14 @@ async function deactivateUser(id) {
         if (!target || target.status !== 'active') throw new AppError('Usuario activo no encontrado', 404);
         if (target.role === 'admin') {
             const [admins] = await connection.execute(
-                `SELECT u.id_usuario AS id FROM users u JOIN roles r ON r.id_rol = u.id_rol
+                `SELECT u.id_usuario AS id FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
                  WHERE u.estado_usuario = 'active' AND r.nombre_rol = 'admin' FOR UPDATE`
             );
             if (admins.length <= 1) {
                 throw new AppError('No se puede inactivar: debe existir al menos un administrador activo', 409);
             }
         }
-        await connection.execute("UPDATE users SET estado_usuario = 'inactive' WHERE id_usuario = ?", [id]);
+        await connection.execute("UPDATE usuario SET estado_usuario = 'inactive' WHERE id_usuario = ?", [id]);
         await connection.commit();
     } catch (error) {
         await connection.rollback();

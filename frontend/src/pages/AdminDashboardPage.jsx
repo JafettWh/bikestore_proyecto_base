@@ -592,14 +592,16 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
 
       {/* MODALES */}
       <ProductFormModal isOpen={isProductModalOpen} productToEdit={productToEdit} onClose={() => setIsProductModalOpen(false)} onSave={async (data) => {
-            await onSaveProduct(data);
+            const savedProduct = await onSaveProduct(data);
             setManagedProducts((previous) => {
-                const exists = previous.some((product) => product.id === data.id);
-                return exists ? previous.map((product) => product.id === data.id ? { ...product, ...data } : product) : [{ ...data, status: "Activo" }, ...previous];
+                const exists = previous.some((product) => product.id === savedProduct.id);
+                return exists
+                    ? previous.map((product) => product.id === savedProduct.id ? savedProduct : product)
+                    : [savedProduct, ...previous];
             });
             showNotice(productToEdit
-                ? `Producto ${data.name} actualizado exitosamente.`
-                : `Producto ${data.name} registrado en catálogo.`);
+                ? `Producto ${savedProduct.name} actualizado exitosamente.`
+                : `Producto ${savedProduct.name} registrado en catálogo.`);
         }}/>
 
       <ProductDeactivateModal isOpen={!!productToDeactivate} product={productToDeactivate} onClose={() => setProductToDeactivate(null)} onConfirm={async (id, reason) => {

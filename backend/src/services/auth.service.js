@@ -36,7 +36,7 @@ async function findUserByEmail(email) {
                 u.ciudad AS city, u.departamento AS department,
                 u.estado_usuario AS status, u.created_at,
                 r.nombre_rol AS role
-         FROM users u JOIN roles r ON r.id_rol = u.id_rol
+         FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
          WHERE u.correo_usuario = ?`,
         [email]
     );
@@ -59,8 +59,8 @@ async function registerUser({ name, nombre, email, password, phone, acceptedTerm
     const hash = await bcrypt.hash(password, 12);
     try {
         const [result] = await pool.execute(
-            `INSERT INTO users (id_rol, nombre_usuario, correo_usuario, contraseña_hash, telefono_usuario, terms_accepted_at)
-             SELECT id_rol, ?, ?, ?, ?, CURRENT_TIMESTAMP FROM roles WHERE nombre_rol = 'cliente'`,
+            `INSERT INTO usuario (id_rol, nombre_usuario, correo_usuario, contraseña_hash, telefono_usuario, terms_accepted_at)
+             SELECT id_rol, ?, ?, ?, ?, CURRENT_TIMESTAMP FROM rol WHERE nombre_rol = 'cliente'`,
             [userName, normalizedEmail, hash, phone.trim()]
         );
         return { id: result.insertId };
@@ -95,7 +95,7 @@ async function updateOwnProfile(userId, data) {
 
     try {
         const [result] = await pool.execute(
-            `UPDATE users
+            `UPDATE usuario
              SET nombre_usuario = ?, correo_usuario = ?, telefono_usuario = ?, direccion_detallada = ?,
                  barrio = ?, ciudad = ?, departamento = ?
              WHERE id_usuario = ? AND estado_usuario = 'active'`,
@@ -126,7 +126,7 @@ async function findUserById(id) {
                 u.ciudad AS city, u.departamento AS department,
                 u.estado_usuario AS status, u.created_at,
             r.nombre_rol AS role
-         FROM users u JOIN roles r ON r.id_rol = u.id_rol WHERE u.id_usuario = ?`,
+         FROM usuario u JOIN rol r ON r.id_rol = u.id_rol WHERE u.id_usuario = ?`,
         [id]
     );
     return rows[0] || null;
@@ -145,11 +145,12 @@ async function requestPasswordRecovery(email) {
 
     const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
     const codeHash = crypto.createHash('sha256').update(code).digest('hex');
-    await pool.execute('DELETE FROM password_reset_codes WHERE user_id = ?', [user.id]);
-    const [result] = await pool.execute(
-        `INSERT INTO password_reset_codes (user_id, code_hash, expires_at)
-         VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 15 MINUTE))`,
-        [user.id, codeHash]
+    await pool.execute(
+        `UPDATE usuario
+         SET codigo_recuperacion_hash = ?, codigo_recuperacion_vence = DATE_ADD(NOW(), INTERVAL 15 MINUTE),
+             intentos_recuperacion = 0, codigo_recuperacion_verificado_en = NULL
+         WHERE id_usuario = ?`,
+        [codeHash, user.id]
     );
 
     const transporter = nodemailer.createTransport({
@@ -167,7 +168,13 @@ async function requestPasswordRecovery(email) {
             text: `Tu código de recuperación es ${code}. Es válido por 15 minutos y solo puede utilizarse una vez.`
         });
     } catch (error) {
-        await pool.execute('DELETE FROM password_reset_codes WHERE id = ?', [result.insertId]);
+        await pool.execute(
+            `UPDATE usuario
+             SET codigo_recuperacion_hash = NULL, codigo_recuperacion_vence = NULL,
+                 intentos_recuperacion = 0, codigo_recuperacion_verificado_en = NULL
+             WHERE id_usuario = ? AND codigo_recuperacion_hash = ?`,
+            [user.id, codeHash]
+        );
         throw new AppError('No fue posible enviar el correo. Verifica la configuración de Gmail e intenta de nuevo.', 502);
     }
     return { message: 'Enviamos un código de recuperación a tu correo. Es válido por 15 minutos.' };
@@ -178,44 +185,65 @@ async function verifyRecoveryCode({ email, code }) {
     if (!normalizedEmail || !/^\d{6}$/.test(code || '')) {
         throw new AppError('Ingresa el correo y el código de seis dígitos', 400);
     }
+    validateEmail(normalizedEmail);
     const user = await findUserByEmail(normalizedEmail);
     if (!user || user.status !== 'active') throw new AppError('La solicitud de recuperación ya no es válida', 400);
 
     const codeHash = crypto.createHash('sha256').update(code).digest('hex');
     const connection = await pool.getConnection();
-    let validResetId;
+    let verifiedUserId;
     let committed = false;
     try {
         await connection.beginTransaction();
         const [rows] = await connection.execute(
-            `SELECT id, code_hash, attempts, expires_at, verified_at
-             FROM password_reset_codes
-             WHERE user_id = ? AND used_at IS NULL
-             ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+            `SELECT codigo_recuperacion_hash AS code_hash, intentos_recuperacion AS attempts,
+                    codigo_recuperacion_vence AS expires_at, estado_usuario AS status
+             FROM usuario WHERE id_usuario = ? FOR UPDATE`,
             [user.id]
         );
         const record = rows[0];
-        if (!record || new Date(record.expires_at) <= new Date() || record.attempts >= 5) {
+        if (!record || record.status !== 'active' || !record.code_hash
+            || new Date(record.expires_at) <= new Date() || record.attempts >= 5) {
+            if (record?.code_hash && (new Date(record.expires_at) <= new Date() || record.attempts >= 5)) {
+                await connection.execute(
+                    `UPDATE usuario
+                     SET codigo_recuperacion_hash = NULL, codigo_recuperacion_vence = NULL,
+                         intentos_recuperacion = 0, codigo_recuperacion_verificado_en = NULL
+                     WHERE id_usuario = ?`,
+                    [user.id]
+                );
+            }
             await connection.commit();
             committed = true;
             throw new AppError('El código es inválido o expiró. Solicita uno nuevo.', 400);
         }
         if (record.code_hash !== codeHash) {
-            await connection.execute(
-                'UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ?',
-                [record.id]
-            );
+            const attempts = Number(record.attempts) + 1;
+            if (attempts >= 5) {
+                await connection.execute(
+                    `UPDATE usuario
+                     SET codigo_recuperacion_hash = NULL, codigo_recuperacion_vence = NULL,
+                         intentos_recuperacion = 0, codigo_recuperacion_verificado_en = NULL
+                     WHERE id_usuario = ?`,
+                    [user.id]
+                );
+            } else {
+                await connection.execute(
+                    'UPDATE usuario SET intentos_recuperacion = ? WHERE id_usuario = ?',
+                    [attempts, user.id]
+                );
+            }
             await connection.commit();
             committed = true;
             throw new AppError('El código ingresado es incorrecto', 400);
         }
         await connection.execute(
-            'UPDATE password_reset_codes SET verified_at = NOW() WHERE id = ?',
-            [record.id]
+            'UPDATE usuario SET codigo_recuperacion_verificado_en = NOW() WHERE id_usuario = ?',
+            [user.id]
         );
         await connection.commit();
         committed = true;
-        validResetId = record.id;
+        verifiedUserId = user.id;
     } catch (error) {
         if (!committed) await connection.rollback();
         throw error;
@@ -225,7 +253,7 @@ async function verifyRecoveryCode({ email, code }) {
 
     return {
         resetToken: jwt.sign(
-            { purpose: 'password-reset', resetId: validResetId, userId: user.id },
+            { purpose: 'password-reset', userId: verifiedUserId },
             env.jwt.secret,
             { expiresIn: '10m' }
         )
@@ -248,21 +276,26 @@ async function resetPassword({ resetToken, password }) {
     try {
         await connection.beginTransaction();
         const [rows] = await connection.execute(
-            `SELECT pr.id, pr.user_id, pr.verified_at, pr.expires_at, pr.used_at, u.contraseña_hash AS password_hash
-             FROM password_reset_codes pr JOIN users u ON u.id_usuario = pr.user_id
-             WHERE pr.id = ? AND pr.user_id = ? FOR UPDATE`,
-            [claims.resetId, claims.userId]
+            `SELECT codigo_recuperacion_hash AS code_hash, codigo_recuperacion_verificado_en AS verified_at,
+                    codigo_recuperacion_vence AS expires_at, contraseña_hash AS password_hash
+             FROM usuario WHERE id_usuario = ? AND estado_usuario = 'active' FOR UPDATE`,
+            [claims.userId]
         );
         const record = rows[0];
-        if (!record || !record.verified_at || record.used_at || new Date(record.expires_at) <= new Date()) {
+        if (!record || !record.code_hash || !record.verified_at || new Date(record.expires_at) <= new Date()) {
             throw new AppError('La verificación expiró. Solicita un nuevo código.', 400);
         }
         if (await bcrypt.compare(password, record.password_hash)) {
             throw new AppError('La nueva contraseña debe ser diferente a la anterior', 400);
         }
         const hash = await bcrypt.hash(password, 12);
-        await connection.execute('UPDATE users SET `contraseña_hash` = ? WHERE id_usuario = ?', [hash, claims.userId]);
-        await connection.execute('UPDATE password_reset_codes SET used_at = NOW() WHERE id = ?', [record.id]);
+        await connection.execute(
+            `UPDATE usuario
+             SET contraseña_hash = ?, codigo_recuperacion_hash = NULL, codigo_recuperacion_vence = NULL,
+                 intentos_recuperacion = 0, codigo_recuperacion_verificado_en = NULL
+             WHERE id_usuario = ?`,
+            [hash, claims.userId]
+        );
         await connection.commit();
         return { message: 'Contraseña actualizada. Ya puedes iniciar sesión.' };
     } catch (error) {

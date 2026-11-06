@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }) => {
       setToken(newToken);
       setCurrentUser(user);
       setAuthError("");
-      return { success: true, message: `Bienvenido, ${user.name}`, user };
+      return { success: true, message: `Bienvenido, ${user.name}`, user, token: newToken };
     } catch (error) {
       return { success: false, message: error.message };
     }

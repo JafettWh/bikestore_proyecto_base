@@ -9,9 +9,32 @@ function validateCheckout(data) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) throw new AppError('El correo de envío no es válido', 400);
     if (!['card', 'pse'].includes(data.paymentMethod)) throw new AppError('Selecciona un método de pago válido', 400);
     if (data.paymentMethod === 'card') {
-        const digits = String(data.cardNumber || '').replace(/\D/g, '');
-        if (digits.length < 12 || digits.length > 19 || !/^\d{2}\s*\/\s*\d{2,4}$/.test(data.expiry || '') || !/^\d{3,4}$/.test(data.cvv || '')) {
-            throw new AppError('Los datos de la tarjeta simulada tienen un formato inválido', 400);
+        const digits = String(data.cardNumber || '');
+        if (!/^\d{13,19}$/.test(digits) || /^(\d)\1+$/.test(digits)) {
+            throw new AppError('El número de la tarjeta simulada no es válido', 400);
+        }
+        let sum = 0;
+        let doubleDigit = false;
+        for (let index = digits.length - 1; index >= 0; index -= 1) {
+            let digit = Number(digits[index]);
+            if (doubleDigit) {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+            }
+            sum += digit;
+            doubleDigit = !doubleDigit;
+        }
+        if (sum % 10 !== 0) throw new AppError('El número de la tarjeta simulada no es válido', 400);
+        const expiry = /^(0[1-9]|1[0-2])\/(\d{2})$/.exec(String(data.expiry || ''));
+        if (!expiry) throw new AppError('La fecha de vencimiento debe tener el formato MM/AA', 400);
+        const month = Number(expiry[1]);
+        const year = 2000 + Number(expiry[2]);
+        const now = new Date();
+        if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) {
+            throw new AppError('La tarjeta simulada está vencida', 400);
+        }
+        if (!/^\d{3}$/.test(String(data.cvv || ''))) {
+            throw new AppError('El CVV/CVC debe contener exactamente 3 números', 400);
         }
     } else if (typeof data.bankName !== 'string' || !data.bankName.trim()) {
         throw new AppError('Selecciona el banco para continuar con el pago simulado', 400);
@@ -29,15 +52,15 @@ async function createOrder(userId, data) {
     let orderId;
     try {
         await connection.beginTransaction();
-        const [carts] = await connection.execute('SELECT id FROM carts WHERE id_usuario = ? FOR UPDATE', [userId]);
+        const [carts] = await connection.execute('SELECT id FROM carrito WHERE id_usuario = ? FOR UPDATE', [userId]);
         const cartId = carts[0]?.id;
         if (!cartId) throw new AppError('El carrito está vacío', 400);
         const [items] = await connection.execute(
-                `SELECT ci.id_producto AS product_id, ci.selected_size, ci.quantity,
+                `SELECT ci.id_producto AS product_id, ci.talla_seleccionada AS selected_size, ci.cantidad AS quantity,
                     p.nombre_producto AS name, p.precio_producto AS price, p.stock,
                     p.estado_producto AS status
-                 FROM cart_items ci JOIN products p ON p.id_producto = ci.id_producto
-             WHERE ci.cart_id = ? FOR UPDATE`,
+                 FROM detalle_carrito ci JOIN producto p ON p.id_producto = ci.id_producto
+             WHERE ci.id_carrito = ? FOR UPDATE`,
             [cartId]
         );
         if (!items.length) throw new AppError('El carrito está vacío', 400);
@@ -52,7 +75,7 @@ async function createOrder(userId, data) {
         const shipping = subtotal > 0 && subtotal < 300000 ? 15000 : 0;
         const total = subtotal + shipping;
         const [result] = await connection.execute(
-                        `INSERT INTO orders
+                        `INSERT INTO pedido
                          (order_number, id_usuario, estado_pedido, subtotal, shipping, total, nombre_destinatario,
                             correo_destinatario, telefono_destinatario, dp_direccion_detallada, dp_barrio,
                             dp_ciudad, dp_departamento, metodo_pago)
@@ -76,21 +99,22 @@ async function createOrder(userId, data) {
         orderId = result.insertId;
         for (const item of items) {
             await connection.execute(
-                `INSERT INTO order_items (id_pedido, id_producto, nombre_producto, cantidad, precio_unitario, selected_size)
+                `INSERT INTO detalle_pedido (id_pedido, id_producto, nombre_producto, cantidad, precio_unitario, selected_size)
                  VALUES (?, ?, ?, ?, ?, ?)`,
                 [orderId, item.product_id, item.name, item.quantity, item.price, item.selected_size || null]
             );
             await connection.execute(
-                'UPDATE products SET stock = stock - ? WHERE id_producto = ?',
+                'UPDATE producto SET stock = stock - ? WHERE id_producto = ?',
                 [item.quantity, item.product_id]
             );
         }
         await connection.execute(
-            `INSERT INTO payments (id_pedido, valor_pago, metodo_pago, estado_pago, banco_origen, is_simulated)
-             VALUES (?, ?, ?, 'approved', ?, TRUE)`,
+            `INSERT INTO pago (id_pedido, valor_pago, metodo_pago, banco_origen)
+             VALUES (?, ?, ?, ?)`,
             [orderId, total, data.paymentMethod, data.paymentMethod === 'pse' ? data.bankName.trim() : null]
         );
-        await connection.execute('DELETE FROM cart_items WHERE cart_id = ?', [cartId]);
+        await connection.execute('DELETE FROM detalle_carrito WHERE id_carrito = ?', [cartId]);
+        await connection.execute('DELETE FROM carrito WHERE id = ?', [cartId]);
         await connection.commit();
     } catch (error) {
         await connection.rollback();
@@ -109,7 +133,7 @@ async function getOrder(id, userId) {
             o.dp_direccion_detallada AS address, o.dp_barrio AS neighborhood,
             o.dp_ciudad AS city, o.dp_departamento AS department, o.metodo_pago AS payment_method,
             DATE_FORMAT(o.fecha_pedido, '%Y-%m-%dT%H:%i:%sZ') AS createdAt
-         FROM orders o WHERE o.id_pedido = ? AND (? IS NULL OR o.id_usuario = ?)`,
+         FROM pedido o WHERE o.id_pedido = ? AND (? IS NULL OR o.id_usuario = ?)`,
         [id, userId ?? null, userId ?? null]
     );
     if (!orders.length) throw new AppError('Pedido no encontrado', 404);
@@ -117,7 +141,7 @@ async function getOrder(id, userId) {
     const [items] = await pool.execute(
         `SELECT oi.id_producto AS id, oi.nombre_producto AS name, oi.precio_unitario AS price,
             oi.cantidad AS qty, oi.selected_size AS selectedSize, p.imagen_producto AS image
-         FROM order_items oi JOIN products p ON p.id_producto = oi.id_producto
+         FROM detalle_pedido oi JOIN producto p ON p.id_producto = oi.id_producto
          WHERE oi.id_pedido = ? ORDER BY oi.id_detalle_pedido`,
         [id]
     );
@@ -150,7 +174,7 @@ async function getOrder(id, userId) {
 }
 
 async function listMyOrders(userId) {
-    const [rows] = await pool.execute('SELECT id_pedido AS id FROM orders WHERE id_usuario = ? ORDER BY fecha_pedido DESC', [userId]);
+    const [rows] = await pool.execute('SELECT id_pedido AS id FROM pedido WHERE id_usuario = ? ORDER BY fecha_pedido DESC', [userId]);
     const orders = [];
     for (const row of rows) orders.push(await getOrder(row.id, userId));
     return orders;

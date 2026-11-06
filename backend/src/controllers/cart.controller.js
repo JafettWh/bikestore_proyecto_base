@@ -1,12 +1,8 @@
 const service = require('../services/cart.service');
 
-function cartIdentity(req) {
-    return { userId: req.user?.id, guestKey: req.headers['x-cart-key'] };
-}
-
 async function get(req, res, next) {
     try {
-        return res.json({ ok: true, data: await service.getCart(cartIdentity(req)) });
+        return res.json({ ok: true, data: await service.getCart(req.user.id) });
     } catch (error) {
         return next(error);
     }
@@ -15,7 +11,7 @@ async function get(req, res, next) {
 async function add(req, res, next) {
     try {
         const result = await service.addItem({
-            ...cartIdentity(req),
+            userId: req.user.id,
             productId: req.body.productId,
             quantity: req.body.quantity,
             selectedSize: req.body.selectedSize
@@ -26,10 +22,19 @@ async function add(req, res, next) {
     }
 }
 
+async function importGuestItems(req, res, next) {
+    try {
+        const result = await service.importGuestItems(req.user.id, req.body.items, req.body.importId);
+        return res.json({ ok: true, data: result.items, adjusted: result.adjusted, skipped: result.skipped });
+    } catch (error) {
+        return next(error);
+    }
+}
+
 async function update(req, res, next) {
     try {
         const data = await service.updateItem({
-            ...cartIdentity(req),
+            userId: req.user.id,
             cartItemId: req.params.itemId,
             quantity: req.body.quantity
         });
@@ -41,20 +46,11 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
     try {
-        const data = await service.removeItem({ ...cartIdentity(req), cartItemId: req.params.itemId });
+        const data = await service.removeItem({ userId: req.user.id, cartItemId: req.params.itemId });
         return res.json({ ok: true, data });
     } catch (error) {
         return next(error);
     }
 }
 
-async function claim(req, res, next) {
-    try {
-        const data = await service.claimGuestCart(req.user.id, req.headers['x-cart-key']);
-        return res.json({ ok: true, data });
-    } catch (error) {
-        return next(error);
-    }
-}
-
-module.exports = { get, add, update, remove, claim };
+module.exports = { get, add, importGuestItems, update, remove };

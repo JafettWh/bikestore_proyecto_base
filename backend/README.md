@@ -16,7 +16,7 @@ Desde la raíz del repositorio importa el esquema:
 mysql -u root -p < sql\bikestore.sql
 ```
 
-Si ya importaste el esquema anterior y conservas datos, ejecuta las migraciones desde MySQL Workbench una sola vez y en este orden: `sql/migrations/2026-11-05-align-role-product-model.sql` y `sql/migrations/2026-11-05-align-model-attributes.sql`. La primera agrega permisos CRUD y la relación producto-sección; la segunda conserva los registros y renombra las columnas al español. Si ya aplicaste la primera migración, ejecuta solo la segunda.
+Si ya importaste el esquema anterior y conservas datos, ejecuta las migraciones desde MySQL Workbench una sola vez y en este orden: `sql/migrations/2026-11-05-align-role-product-model.sql`, `sql/migrations/2026-11-05-align-model-attributes.sql`, `sql/migrations/2026-11-05-align-spanish-table-names.sql`, `sql/migrations/2026-11-05-store-temporary-flow-data-only-when-needed.sql`, `sql/migrations/2026-11-06-idempotent-guest-cart-import.sql` y `sql/migrations/2026-11-06-align-spanish-cart-column-names.sql`. Las dos primeras agregan permisos/relaciones y alinean columnas; las siguientes renombran las tablas y eliminan el almacenamiento de carritos visitantes, códigos de recuperación como filas y estados de pago redundantes. La quinta crea el identificador de deduplicación del traspaso y la última traduce los nombres de las columnas del carrito conservando sus datos. La migración de datos temporales elimina los carritos visitantes que existan en la base de datos. No ejecutes estas migraciones sobre una base creada con el SQL actual.
 
 Configura el backend:
 
@@ -42,7 +42,7 @@ Son solo para desarrollo local. Cámbialas antes de compartir el entorno. El see
 
 ## Recuperación de contraseña con Gmail
 
-La API envía códigos de 6 dígitos por SMTP de Gmail; almacena únicamente su hash y vencen en 15 minutos. El código tiene límite de intentos, se valida una sola vez y el token temporal de restablecimiento también vence. Configuración:
+La API envía códigos de 6 dígitos por SMTP de Gmail; guarda como máximo un hash vigente en la fila del usuario y vence en 15 minutos. Un nuevo código reemplaza al anterior; hay límite de intentos, el código se valida una sola vez y los campos temporales se limpian al restablecer la contraseña. No se conserva un historial de códigos. El token temporal de restablecimiento también vence. Configuración:
 
 1. Activa la verificación en dos pasos de la cuenta remitente de Google.
 2. En la configuración de seguridad de Google crea una **Contraseña de aplicación** para BikeStore. No uses la contraseña normal de Gmail.
@@ -65,7 +65,8 @@ Endpoints del flujo: `POST /api/auth/password/forgot`, `POST /api/auth/password/
 | PATCH | `/api/products/:id/deactivate` | Admin | Inactivar producto con motivo |
 | GET/POST | `/api/admin/users` | Admin | Consultar y crear usuarios |
 | PUT/PATCH | `/api/admin/users/:id` | Admin | Actualizar o inactivar cuentas |
-| GET/POST/PATCH/DELETE | `/api/cart` y `/api/cart/items` | Público/sesión | Carrito por visitante o cliente |
+| GET/POST/PATCH/DELETE | `/api/cart` y `/api/cart/items` | Cliente autenticado | Carrito persistente de clientes |
+| POST | `/api/cart/import` | Cliente autenticado | Transfiere el carrito local del visitante a su cuenta |
 | GET/POST | `/api/orders/mine`, `/api/orders` | Cliente | Historial y compra con pago simulado |
 | GET | `/api/admin/dashboard`, `/api/admin/dashboard/export` | Admin | Métricas e información para informes |
 
@@ -73,17 +74,17 @@ El pago es simulado: no se almacenan números de tarjeta ni CVV. Las rutas admin
 
 ## Modelo y trazabilidad documental
 
-El esquema implementa usuarios/roles, secciones/categorías, productos, imágenes/tallas, carritos, pedidos/detalles/pagos y códigos de recuperación. Las columnas de las entidades del modelo usan los nombres en español de los diagramas; Producto se relaciona con Sección y Categoría, y Categoría pertenece a Sección. Las claves foráneas, restricciones `UNIQUE`, `CHECK`, estados y transacciones protegen unicidad, stock, saldos y relaciones. `users.contraseña_hash` y los códigos hash de recuperación atienden RNF-05; las claves foráneas y las operaciones transaccionales preservan RNF-06. RF-08 se implementa con carritos persistidos; RF-30 con JWT y middleware; RF-29 solo permite inactivar cuentas, conforme a la restricción del instructor.
+El esquema implementa usuarios/roles, secciones/categorías, productos, imágenes/tallas, carritos, pedidos/detalles y pagos. Las tablas de entidades usan nombres en español y singular; Producto se relaciona con Sección y Categoría, y Categoría pertenece a Sección. `carrito` y `detalle_carrito` solo se crean para clientes autenticados con productos; el carrito de un visitante vive en `localStorage` y se transfiere al registrarse/iniciar sesión, sin insertar filas temporales de visitantes. Un único identificador de importación en `usuario` hace idempotente el reintento de esa transferencia, sin guardar sus productos como datos de visitante. La fila `usuario` mantiene como máximo un hash temporal de recuperación y se limpia al completar el flujo, sin una tabla de historial. `pago` registra únicamente compras simuladas completadas; el pedido, el pago y la reducción de existencias se confirman juntos en una transacción, por lo que no se reservan existencias en el carrito ni se guarda un estado de pago pendiente/rechazado. Las claves foráneas, restricciones `UNIQUE`, `CHECK`, estados y transacciones protegen unicidad, stock y relaciones. `usuario.contraseña_hash` y el hash de recuperación atienden RNF-05; las claves foráneas y las operaciones transaccionales preservan RNF-06. RF-08 se implementa con carritos persistidos para clientes; RF-30 con JWT y middleware; RF-29 solo permite inactivar cuentas, conforme a la restricción del instructor.
 
 | Flujo e historias según los archivos HU | CU / RF | Datos y API | Superficie React |
 |---|---|---|---|
-| Catálogo y detalle (HU01–HU02) | CU-01–02; RF-01–04 | `sections`, `categories`, `products`, `product_images`, `product_sizes`; `GET /api/products` | `HomePage`, `ProductDetailPage` |
-| Carrito (HU02, HU07–HU08) y persistencia | CU-06–07; RF-05–08 | `carts`, `cart_items`; `/api/cart` y `/api/cart/items/*` | `CartContext`, catálogo y `CartPage` |
-| Registro, sesión, recuperación y roles (HU03–HU06) | CU-03–05; RF-13–16, RF-30 | `users`, `roles`, `password_reset_codes`; `/api/auth/*` | `AuthPage`, `perfilpage` |
-| Compra y pago simulado (HU09) | CU-08; RF-09–12 | `orders`, `order_items`, `payments`; `POST /api/orders` | `CheckoutPage` y confirmación de compra |
-| CRUD y búsqueda de productos (HU10–HU13) | CU-09–12; RF-17–20 | `products` se relaciona con `sections` y `categories`; `product_images`, `product_sizes`; `/api/products/*` | `ProductFormModal`, `AdminDashboardPage` |
+| Catálogo y detalle (HU01–HU02) | CU-01–02; RF-01–04 | `seccion`, `categoria`, `producto`, `imagen`, `talla`; `GET /api/products` | `HomePage`, `ProductDetailPage` |
+| Carrito (HU02, HU07–HU08) y persistencia | CU-06–07; RF-05–08 | `carrito`, `detalle_carrito`; visitante en `localStorage`, `/api/cart` solo para clientes | `CartContext`, catálogo y `CartPage` |
+| Registro, sesión, recuperación y roles (HU03–HU06) | CU-03–05; RF-13–16, RF-30 | `usuario` (un hash temporal de recuperación), `rol`; `/api/auth/*` | `AuthPage`, `perfilpage` |
+| Compra y pago simulado (HU09) | CU-08; RF-09–12 | `pedido`, `detalle_pedido`, `pago`; `POST /api/orders` | `CheckoutPage` y confirmación de compra |
+| CRUD y búsqueda de productos (HU10–HU13) | CU-09–12; RF-17–20 | `producto` se relaciona con `seccion` y `categoria`; `imagen`, `talla`; `/api/products/*` | `ProductFormModal`, `AdminDashboardPage` |
 | Dashboard y alertas (HU17) | CU-13; RF-21–25 | Pedidos/detalles, productos y categorías; `GET /api/admin/dashboard` | `AdminDashboardPage` |
 | Exportación de informes (HU18) | CU-14; RF-26 | Datos agregados del dashboard; `GET /api/admin/dashboard/export` | `documents.js`, `AdminDashboardPage` |
-| Gestión de usuarios (HU14–HU16) | CU-15–17; RF-27–29, RF-31 | `users`, `roles`; `/api/admin/users/*` | `UserFormModal`, `AdminDashboardPage` |
+| Gestión de usuarios (HU14–HU16) | CU-15–17; RF-27–29, RF-31 | `usuario`, `rol`; `/api/admin/users/*` | `UserFormModal`, `AdminDashboardPage` |
 
 Hay diferencias de numeración entre los renglones de trazabilidad de `Requerimientos_BikeStore.md` y los nombres/contenido de algunas HU: la tabla asocia RF-08 a HU09 aunque el archivo HU09 es compra; RF-09–12 apunta a HU10 aunque el flujo de compra está en HU09; RF-17 apunta a HU11 aunque CU-09 y la HU de registro de productos lo asocian a HU10; CU-13/RF-21–25 corresponde a HU17 y CU-14/RF-26 a HU18 (la tabla de RF indica HU18/HU19). La gestión de usuarios también tiene desplazamientos en algunas referencias HU de la tabla. La implementación sigue los flujos y criterios de aceptación escritos en los CU y archivos HU, y conserva intactos los documentos fuente.

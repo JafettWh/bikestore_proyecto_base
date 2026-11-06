@@ -31,12 +31,39 @@ const departamentosColombia = {
     "Córdoba": ["Montería", "Cereté", "Lorica"],
     "Cesar": ["Valledupar", "Aguachica"],
 };
+
+function isValidCardNumber(value) {
+    if (!/^\d{13,19}$/.test(value) || /^(\d)\1+$/.test(value)) return false;
+    let sum = 0;
+    let doubleDigit = false;
+    for (let index = value.length - 1; index >= 0; index -= 1) {
+        let digit = Number(value[index]);
+        if (doubleDigit) {
+            digit *= 2;
+            if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+        doubleDigit = !doubleDigit;
+    }
+    return sum % 10 === 0;
+}
+
+function isValidExpiry(value) {
+    const match = /^(0[1-9]|1[0-2])\/(\d{2})$/.exec(value);
+    if (!match) return false;
+    const month = Number(match[1]);
+    const year = 2000 + Number(match[2]);
+    const now = new Date();
+    return year > now.getFullYear() || (year === now.getFullYear() && month >= now.getMonth() + 1);
+}
+
 export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
     const { items, subtotal, tax, shipping, total, clearCart } = useCart();
     const { token } = useAuth();
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [address, setAddress] = useState("");
+    const [neighborhood, setNeighborhood] = useState("");
     const [phone, setPhone] = useState("");
     const [department, setDepartment] = useState("");
     const [city, setCity] = useState("");
@@ -72,6 +99,20 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
     const handleCheckout = async (e) => {
         e.preventDefault();
         setCheckoutError("");
+        if (paymentMethod === "card") {
+            if (!isValidCardNumber(cardNumber)) {
+                setCheckoutError("Ingresa un número de tarjeta válido de 13 a 19 dígitos.");
+                return;
+            }
+            if (!isValidExpiry(expiry)) {
+                setCheckoutError("Ingresa una fecha de vencimiento válida en formato MM/AA y que no haya vencido.");
+                return;
+            }
+            if (!/^\d{3}$/.test(cvv)) {
+                setCheckoutError("El CVV/CVC debe contener exactamente 3 números.");
+                return;
+            }
+        }
         setIsProcessing(true);
         try {
             const { data: newOrder } = await apiRequest("/orders", {
@@ -81,6 +122,7 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
                     name,
                     email,
                     address,
+                    neighborhood,
                     phone,
                     department,
                     city,
@@ -162,6 +204,10 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
               </div>
 
               <div className="checkout-div-5">
+                <Input label="Barrio / Apartamento / Indicaciones de entrega" placeholder="Opcional" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)}/>
+              </div>
+
+              <div className="checkout-div-5">
                 <Input label="Teléfono Móvil de Contacto" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="300 000 0000"/>
               </div>
             </div>
@@ -193,10 +239,13 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
 
             {paymentMethod === "card" ? (<div className="checkout-div-7">
                 <div className="checkout-div-8">
-                  <Input label="Número de Tarjeta (simulado)" required inputMode="numeric" placeholder="Ingresa datos de prueba; no uses una tarjeta real" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)}/>
+                  <Input id="card-number" label="Número de Tarjeta (simulado)" required inputMode="numeric" autoComplete="off" maxLength={19} pattern="[0-9]{13,19}" placeholder="Ingresa datos de prueba; no uses una tarjeta real" value={cardNumber} onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, "").slice(0, 19))}/>
                 </div>
-                <Input label="Vencimiento" required placeholder="MM / AA" value={expiry} onChange={(e) => setExpiry(e.target.value)}/>
-                <Input label="CVV / CVC (simulado)" required type="password" placeholder="Código de prueba" value={cvv} onChange={(e) => setCvv(e.target.value)}/>
+                <Input id="card-expiry" label="Vencimiento" required inputMode="numeric" autoComplete="off" maxLength={5} pattern="(0[1-9]|1[0-2])/[0-9]{2}" placeholder="MM/AA" value={expiry} onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+                    setExpiry(digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits);
+                }}/>
+                <Input id="card-cvv" label="CVV / CVC (simulado)" required type="password" passwordHint="3 dígitos" inputMode="numeric" autoComplete="off" maxLength={3} pattern="[0-9]{3}" placeholder="Código de prueba" value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 3))}/>
                 <div className="checkout-div-9">
                   <span className="checkout-span-4">
                     <Icon name="check" size={13}/> Pasarela Aprobada
@@ -242,7 +291,7 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
                     {item.name}
                   </h4>
                   <div className="checkout-div-14">
-                    <span>Cant: {item.qty}</span>
+                    <span>Cantidad: {item.qty}</span>
                     {item.selectedSize && <span> · Talla: {item.selectedSize}</span>}
                   </div>
                   <span className="checkout-span-5">

@@ -9,7 +9,7 @@ function errorHandler(error, req, res, next) {
     }
 
     if (error.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ ok: false, message: 'La imagen no puede superar 2 MB' });
+        return res.status(400).json({ ok: false, message: 'La imagen no puede superar 20 MB' });
     }
 
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {

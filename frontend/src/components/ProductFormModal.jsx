@@ -23,9 +23,10 @@ export const ProductFormModal = ({
   const [stock, setStock] = useState("");
   const [image, setImage] = useState("");
   const [imageFile, setImageFile] = useState(null);
+  const [sizes, setSizes] = useState("");
   const [badge, setBadge] = useState("");
   const [description, setDescription] = useState("");
-  // Campo VARCHAR para Especificaciones Técnicas (CU-09 y CU-11)
+  // Especificaciones técnicas del producto
   const [technicalSpecs, setTechnicalSpecs] = useState("");
   const [error, setError] = useState("");
 
@@ -38,16 +39,16 @@ export const ProductFormModal = ({
       setStock(String(productToEdit.stock ?? ""));
       setImage(productToEdit.image || "");
       setImageFile(null);
+      setSizes(Array.isArray(productToEdit.sizes) ? productToEdit.sizes.join(", ") : "");
       setBadge(productToEdit.badge || "");
       setDescription(productToEdit.description || "");
 
       // Cargar especificaciones técnicas existentes (CU-11)
-      if (productToEdit.technicalSpecs) {
-        setTechnicalSpecs(productToEdit.technicalSpecs);
-      } else if (typeof productToEdit.specs === "string") {
-        setTechnicalSpecs(productToEdit.specs);
-      } else if (productToEdit.specs && typeof productToEdit.specs === "object") {
-        const formatted = Object.entries(productToEdit.specs)
+      const currentSpecs = productToEdit.technicalSpecs || productToEdit.specs;
+      if (typeof currentSpecs === "string") {
+        setTechnicalSpecs(currentSpecs);
+      } else if (currentSpecs && typeof currentSpecs === "object") {
+        const formatted = Object.entries(currentSpecs)
           .map(([key, val]) => `${key.charAt(0).toUpperCase() + key.slice(1)}: ${val}`)
           .join("\n");
         setTechnicalSpecs(formatted);
@@ -62,6 +63,7 @@ export const ProductFormModal = ({
       setStock("");
       setImage("");
       setImageFile(null);
+      setSizes("");
       setBadge("");
       setDescription("");
       // Limpiar para registro nuevo (CU-09)
@@ -76,6 +78,7 @@ export const ProductFormModal = ({
     e.preventDefault();
     const numPrice = Number(price);
     const numStock = Number(stock);
+    const productSizes = [...new Set(sizes.split(/[,\n]/).map((size) => size.trim()).filter(Boolean))];
 
     // Validaciones de CU-09 y CU-11
     if (!name.trim()) {
@@ -84,7 +87,7 @@ export const ProductFormModal = ({
     }
 
     if (isNaN(numPrice) || numPrice <= 0) {
-      setError("El precio debe ser un número mayor a 0 (CU-11 paso 4).");
+      setError("El precio debe ser un número mayor a 0.");
       return;
     }
 
@@ -111,11 +114,11 @@ export const ProductFormModal = ({
         stock: numStock,
         image,
         imageFile,
+        sizes: productSizes,
         badge: badge.trim() || undefined,
         description: description.trim(),
         technicalSpecs: technicalSpecs.trim() || undefined,
         specs: technicalSpecs.trim() || productToEdit?.specs,
-        sizes: productToEdit?.sizes || [],
         status: productToEdit?.status || "Activo",
       });
       onClose();
@@ -138,8 +141,8 @@ export const ProductFormModal = ({
         <div className="product-form-modal-div-3">
           <h3 className="product-form-modal-h3-1">
             {productToEdit
-              ? "Actualizar Producto (CU-11)"
-              : "Registrar Nuevo Producto (CU-09)"}
+              ? "Actualizar Producto"
+              : "Registrar Nuevo Producto"}
           </h3>
           <button
             type="button"
@@ -211,12 +214,19 @@ export const ProductFormModal = ({
               onChange={(e) => setStock(e.target.value)}
             />
             <Input
-              label="Badge / Etiqueta"
+              label="Etiqueta"
               placeholder="Ej. Nuevo, Oferta..."
               value={badge}
               onChange={(e) => setBadge(e.target.value)}
             />
           </div>
+
+          <Input
+            label="Tallas disponibles"
+            placeholder="Ej. S, M, L o 52, 54 (separadas por coma)"
+            value={sizes}
+            onChange={(e) => setSizes(e.target.value)}
+          />
 
           <div className="product-form-modal-div-6">
             <label className="product-form-modal-label-1">
@@ -250,11 +260,12 @@ export const ProductFormModal = ({
                 img-018 (Casco Prevail)
               </option>
             </select>
-            <label className="product-form-modal-label-1" htmlFor="product-image-file">O carga una imagen JPG, PNG o WEBP (máximo 2 MB)</label>
+            <label className="product-form-modal-label-1" htmlFor="product-image-file">O carga una imagen JPG, PNG o WEBP (máximo 20 MB)</label>
             <input id="product-image-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => {
               const file = event.target.files?.[0] || null;
-              if (file && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2 * 1024 * 1024)) {
-                setError("Selecciona una imagen JPG, PNG o WEBP de máximo 2 MB.");
+              if (file && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 20 * 1024 * 1024)) {
+                setError("Selecciona una imagen JPG, PNG o WEBP de máximo 20 MB.");
+                setImageFile(null);
                 event.target.value = "";
                 return;
               }
@@ -263,31 +274,32 @@ export const ProductFormModal = ({
             }} />
           </div>
 
-          <div className="product-form-modal-div-6">
-            <label className="product-form-modal-label-1">
-              Descripción Comercial
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Descripción de materiales, tecnología y rendimiento..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="product-form-modal-textarea-1"
-            />
-          </div>
+          <div className="product-form-modal-div-9">
+            <div className="product-form-modal-div-6">
+              <label className="product-form-modal-label-1">
+                Descripción Comercial
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Descripción de materiales, tecnología y rendimiento..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="product-form-modal-textarea-1"
+              />
+            </div>
 
-          {/* Campo VARCHAR Especificaciones Técnicas (CU-09 y CU-11) */}
-          <div className="product-form-modal-div-6">
-            <label className="product-form-modal-label-1">
-              Especificaciones Técnicas
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Detalles técnicos: material del marco, horquilla, transmisión, frenos, peso, garantía..."
-              value={technicalSpecs}
-              onChange={(e) => setTechnicalSpecs(e.target.value)}
-              className="product-form-modal-textarea-1"
-            />
+            <div className="product-form-modal-div-6">
+              <label className="product-form-modal-label-1">
+                Especificaciones Técnicas
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Detalles técnicos: material del marco, horquilla, transmisión, frenos, peso, garantía..."
+                value={technicalSpecs}
+                onChange={(e) => setTechnicalSpecs(e.target.value)}
+                className="product-form-modal-textarea-1"
+              />
+            </div>
           </div>
 
           <div className="product-form-modal-div-8">

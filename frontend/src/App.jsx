@@ -111,7 +111,7 @@ function AppContent() {
     };
     // Guardar o actualizar producto desde el Admin (CU-09, CU-11)
     const handleSaveProduct = async (productData) => {
-        const editing = products.some((product) => product.id === productData.id);
+        const editing = productData.id !== undefined && productData.id !== null;
         const { imageFile, ...fields } = productData;
         let body = fields;
         if (imageFile) {

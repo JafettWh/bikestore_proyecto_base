@@ -39,11 +39,11 @@ async function getDashboard(query = {}) {
     const period = periodFor(query);
     const section = query.section && query.section !== 'Todas' ? String(query.section) : '';
     const filter = filterFor(period, section);
-    const joins = `FROM orders o
-        JOIN order_items oi ON oi.id_pedido = o.id_pedido
-        JOIN products p ON p.id_producto = oi.id_producto
-        JOIN categories c ON c.id_categoria = p.id_categoria
-        JOIN sections s ON s.id_seccion = p.id_seccion`;
+    const joins = `FROM pedido o
+        JOIN detalle_pedido oi ON oi.id_pedido = o.id_pedido
+        JOIN producto p ON p.id_producto = oi.id_producto
+        JOIN categoria c ON c.id_categoria = p.id_categoria
+        JOIN seccion s ON s.id_seccion = p.id_seccion`;
 
     const [[totals], [topProducts], [series], [alerts]] = await Promise.all([
         pool.execute(
@@ -69,7 +69,7 @@ async function getDashboard(query = {}) {
              GROUP BY period_key ORDER BY period_key`,
             filter.params
         ),
-        pool.execute("SELECT COUNT(*) AS count FROM products WHERE estado_producto = 'active' AND stock = 0")
+        pool.execute("SELECT COUNT(*) AS count FROM producto WHERE estado_producto = 'active' AND stock = 0")
     ]);
 
     const isDaily = period.view === 'days' && period.month !== null;
@@ -112,11 +112,11 @@ async function getExportData(query = {}) {
             oi.nombre_producto AS productName, oi.cantidad AS quantity,
             oi.precio_unitario AS unitPrice, s.nombre_seccion AS section,
             c.nombre_categoria AS category
-         FROM orders o
-         JOIN order_items oi ON oi.id_pedido = o.id_pedido
-         JOIN products p ON p.id_producto = oi.id_producto
-         JOIN categories c ON c.id_categoria = p.id_categoria
-         JOIN sections s ON s.id_seccion = p.id_seccion
+         FROM pedido o
+         JOIN detalle_pedido oi ON oi.id_pedido = o.id_pedido
+         JOIN producto p ON p.id_producto = oi.id_producto
+         JOIN categoria c ON c.id_categoria = p.id_categoria
+         JOIN seccion s ON s.id_seccion = p.id_seccion
          WHERE ${filter.where}
          ORDER BY o.fecha_pedido DESC, o.order_number`,
         filter.params

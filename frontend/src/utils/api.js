@@ -8,10 +8,9 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiRequest(path, { token, guestKey, ...options } = {}) {
+export async function apiRequest(path, { token, ...options } = {}) {
   const headers = new Headers(options.headers || {});
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (guestKey) headers.set("X-Cart-Key", guestKey);
   if (options.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
     options.body = JSON.stringify(options.body);

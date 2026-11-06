@@ -113,7 +113,7 @@ export const HomePage = ({ products = [], error = "", onAddToCart, onSelectProdu
               <option value="Todas">Todas las categorías</option>
               {categories.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
-            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="home-select-1">
+            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="home-select-1" aria-label="Ordenar productos">
               <option value="default">Ordenar por: Relevancia</option>
               <option value="asc">Precio: Menor a Mayor</option>
               <option value="desc">Precio: Mayor a Menor</option>

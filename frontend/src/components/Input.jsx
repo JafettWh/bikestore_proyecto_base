@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Icon from "./Icon";
 import "../assets/styles.css";
-export const Input = ({ label, error, helper, icon, className = "", id, type = "text", showTogglePassword = true, ...props }) => {
+export const Input = ({ label, error, helper, icon, className = "", id, type = "text", showTogglePassword = true, passwordHint = "Mínimo 8 caracteres", ...props }) => {
     const [showPassword, setShowPassword] = useState(false);
     const isPasswordField = type === "password";
     const actualType = isPasswordField && showPassword ? "text" : type;
@@ -11,8 +11,8 @@ export const Input = ({ label, error, helper, icon, className = "", id, type = "
           <label htmlFor={inputId} className="input-label-1">
             {label} {props.required && <span className="input-span-1">*</span>}
           </label>
-          {isPasswordField && (<span className="input-span-2">
-              (Mínimo 8 caracteres)
+          {isPasswordField && passwordHint && (<span className="input-span-2">
+              ({passwordHint})
             </span>)}
         </div>)}
 

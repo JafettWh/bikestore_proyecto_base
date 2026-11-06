@@ -14,7 +14,7 @@ async function authenticate(req, res, next) {
         const [rows] = await pool.execute(
                 `SELECT u.id_usuario AS id, u.nombre_usuario AS name, u.correo_usuario AS email,
                     u.estado_usuario AS status, r.nombre_rol AS role
-                 FROM users u JOIN roles r ON r.id_rol = u.id_rol
+                 FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
                  WHERE u.id_usuario = ?`,
             [claims.id]
         );

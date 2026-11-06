@@ -71,8 +71,8 @@ function validateProduct(data) {
 
 async function categoryIdFor(section, category, connection = pool) {
     const [rows] = await connection.execute(
-        `SELECT c.id_categoria AS id, c.id_seccion AS section_id FROM categories c
-         JOIN sections s ON s.id_seccion = c.id_seccion
+        `SELECT c.id_categoria AS id, c.id_seccion AS section_id FROM categoria c
+         JOIN seccion s ON s.id_seccion = c.id_seccion
          WHERE s.nombre_seccion = ? AND c.nombre_categoria = ?`,
         [section, category]
     );
@@ -86,12 +86,12 @@ async function attachProductOptions(rows) {
     const placeholders = ids.map(() => '?').join(',');
     const [[images], [sizes]] = await Promise.all([
         pool.execute(
-            `SELECT id_producto AS product_id, url_imagen AS image_url FROM product_images
+            `SELECT id_producto AS product_id, url_imagen AS image_url FROM imagen
              WHERE id_producto IN (${placeholders}) ORDER BY position, id_imagen`,
             ids
         ),
         pool.execute(
-            `SELECT id_producto AS product_id, nombre_talla AS name FROM product_sizes
+            `SELECT id_producto AS product_id, nombre_talla AS name FROM talla
              WHERE id_producto IN (${placeholders}) ORDER BY id_talla`,
             ids
         )
@@ -136,9 +136,9 @@ async function listProducts({ search = '', section = '', category = '', category
                 p.imagen_producto AS image_url, p.badge, p.estado_producto AS status,
                 p.motivo_inactivacion AS inactivation_reason,
                 c.id_categoria AS category_id, c.nombre_categoria AS category, s.nombre_seccion AS section
-         FROM products p
-         JOIN categories c ON c.id_categoria = p.id_categoria
-         JOIN sections s ON s.id_seccion = p.id_seccion
+         FROM producto p
+         JOIN categoria c ON c.id_categoria = p.id_categoria
+         JOIN seccion s ON s.id_seccion = p.id_seccion
          ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
          ORDER BY ${ordering}`,
         params
@@ -154,8 +154,8 @@ async function getProduct(id, admin = false) {
             p.imagen_producto AS image_url, p.badge, p.estado_producto AS status,
             p.motivo_inactivacion AS inactivation_reason,
             c.id_categoria AS category_id, c.nombre_categoria AS category, s.nombre_seccion AS section
-         FROM products p JOIN categories c ON c.id_categoria = p.id_categoria
-         JOIN sections s ON s.id_seccion = p.id_seccion
+         FROM producto p JOIN categoria c ON c.id_categoria = p.id_categoria
+         JOIN seccion s ON s.id_seccion = p.id_seccion
          WHERE p.id_producto = ? ${admin ? '' : "AND p.estado_producto = 'active'"}`,
         [id]
     );
@@ -166,7 +166,7 @@ async function getProduct(id, admin = false) {
 async function listCategories() {
     const [rows] = await pool.execute(
         `SELECT c.id_categoria AS id, c.nombre_categoria AS name, s.nombre_seccion AS section
-         FROM categories c JOIN sections s ON s.id_seccion = c.id_seccion
+         FROM categoria c JOIN seccion s ON s.id_seccion = c.id_seccion
          ORDER BY s.id_seccion, c.nombre_categoria`
     );
     return rows.map((row) => ({ id: row.id, name: row.name, section: row.section }));
@@ -184,7 +184,7 @@ async function createProduct(data, fileName) {
         connection = await pool.getConnection();
         await connection.beginTransaction();
         const [result] = await connection.execute(
-                        `INSERT INTO products
+                        `INSERT INTO producto
                          (id_seccion, id_categoria, nombre_producto, descripcion_general, especificaciones_tecnicas,
                             precio_producto, stock, imagen_producto, badge)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -204,14 +204,14 @@ async function createProduct(data, fileName) {
         for (const [position, imageUrl] of arrayValue(data.gallery).entries()) {
             if (imageUrl && imageUrl !== image) {
                 await connection.execute(
-                    'INSERT INTO product_images (id_producto, url_imagen, position) VALUES (?, ?, ?)',
+                    'INSERT INTO imagen (id_producto, url_imagen, position) VALUES (?, ?, ?)',
                     [productId, imageUrl, position]
                 );
             }
         }
         for (const size of arrayValue(data.sizes)) {
             if (typeof size === 'string' && size.trim()) {
-                await connection.execute('INSERT INTO product_sizes (id_producto, nombre_talla) VALUES (?, ?)', [productId, size.trim()]);
+                await connection.execute('INSERT INTO talla (id_producto, nombre_talla) VALUES (?, ?)', [productId, size.trim()]);
             }
         }
         await connection.commit();
@@ -238,7 +238,7 @@ async function updateProduct(id, data, fileName) {
         connection = await pool.getConnection();
         await connection.beginTransaction();
         await connection.execute(
-            `UPDATE products SET id_seccion = ?, id_categoria = ?, nombre_producto = ?, descripcion_general = ?,
+            `UPDATE producto SET id_seccion = ?, id_categoria = ?, nombre_producto = ?, descripcion_general = ?,
              especificaciones_tecnicas = ?, precio_producto = ?, stock = ?, imagen_producto = ?, badge = ?
              WHERE id_producto = ?`,
             [
@@ -256,10 +256,10 @@ async function updateProduct(id, data, fileName) {
         );
         if (data.sizes !== undefined) {
             const sizes = arrayValue(data.sizes);
-            await connection.execute('DELETE FROM product_sizes WHERE id_producto = ?', [id]);
+            await connection.execute('DELETE FROM talla WHERE id_producto = ?', [id]);
             for (const size of sizes) {
                 if (typeof size === 'string' && size.trim()) {
-                    await connection.execute('INSERT INTO product_sizes (id_producto, nombre_talla) VALUES (?, ?)', [id, size.trim()]);
+                    await connection.execute('INSERT INTO talla (id_producto, nombre_talla) VALUES (?, ?)', [id, size.trim()]);
                 }
             }
         }
@@ -278,7 +278,7 @@ async function updateProduct(id, data, fileName) {
 async function deactivateProduct(id, reason) {
     if (typeof reason !== 'string' || !reason.trim()) throw new AppError('El motivo de inactivación es obligatorio', 400);
     const [result] = await pool.execute(
-        `UPDATE products SET estado_producto = 'inactive', motivo_inactivacion = ?
+        `UPDATE producto SET estado_producto = 'inactive', motivo_inactivacion = ?
          WHERE id_producto = ? AND estado_producto = 'active'`,
         [reason.trim(), id]
     );
