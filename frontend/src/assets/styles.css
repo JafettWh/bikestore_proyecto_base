@@ -182,7 +182,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply max-w-[1400px] mx-auto px-6 sm:px-10;
   }
   .footer-div-2 {
-    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-16 text-left;
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 lg:gap-16 text-left;
   }
   .footer-div-3 {
     @apply flex flex-col gap-4;
@@ -840,7 +840,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply pb-6 border-b border-[#2d2e2b];
   }
   .admin-dashboard-span-1 {
-    @apply text-[10px] uppercase font-extrabold tracking-widest text-[#ffd400] block mt-2;
+    @apply text-[11px] uppercase font-extrabold tracking-widest text-[#ffd400] block mt-2;
   }
   .admin-dashboard-nav-1 {
     @apply flex flex-col gap-2;
@@ -1020,10 +1020,10 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply overflow-x-auto;
   }
   .admin-dashboard-table-1 {
-    @apply w-full text-left text-xs border-collapse;
+    @apply w-full text-left text-[11px] border-collapse;
   }
   .admin-dashboard-tr-1 {
-    @apply bg-[#11120f] text-white uppercase text-[10px] tracking-wider;
+    @apply bg-[#11120f] text-white uppercase text-[11px] tracking-wider;
   }
   .admin-dashboard-th-1 {
     @apply p-3.5;
@@ -1047,7 +1047,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply font-bold text-[#11120f] block line-clamp-1;
   }
   .admin-dashboard-span-11 {
-    @apply text-[10px] text-[#b59700] font-bold;
+    @apply text-[11px] text-[#b59700] font-bold;
   }
   .admin-dashboard-td-2 {
     @apply p-3.5 text-[#555];
@@ -1080,7 +1080,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply bg-white p-5 border border-[#dedfd9] rounded-sm;
   }
   .admin-dashboard-span-13 {
-    @apply text-[10px] font-bold uppercase text-[#777a71] block;
+    @apply text-[11px] font-bold uppercase text-[#777a71] block;
   }
   .admin-dashboard-span-14 {
     @apply font-['Barlow_Condensed'] font-bold text-3xl text-[#11120f] block mt-1;
@@ -1095,13 +1095,22 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply p-3.5 text-[#6d6f69];
   }
   .admin-dashboard-span-17 {
-    @apply font-bold px-2 py-0.5 rounded-sm text-[10px] uppercase;
+    @apply font-bold px-2 py-0.5 rounded-sm text-[11px] uppercase;
   }
   .admin-dashboard-span-18 {
     @apply bg-amber-100 text-amber-900 border border-amber-300 font-extrabold;
   }
   .admin-dashboard-span-19 {
     @apply bg-blue-50 text-blue-800 border border-blue-200;
+  }
+  .admin-dashboard-table-1 .badge-span-1 {
+    @apply text-[11px];
+  }
+  .admin-dashboard-pagination {
+    @apply flex items-center justify-end gap-3 border-t border-[#dedfd9] bg-white px-4 py-3 text-[11px] text-[#555];
+  }
+  .admin-dashboard-pagination button {
+    @apply border border-[#dedfd9] bg-white px-3 py-1.5 font-bold text-[#11120f] disabled:cursor-not-allowed disabled:opacity-40;
   }
 
   /* pages/AuthPage.jsx */

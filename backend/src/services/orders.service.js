@@ -48,25 +48,69 @@ function orderNumber() {
 
 async function createOrder(userId, data) {
     validateCheckout(data);
+    if (!Array.isArray(data.items) || !data.items.length || data.items.length > 100) {
+        throw new AppError('El carrito está vacío o contiene demasiados productos', 400);
+    }
+    const requestedItems = new Map();
+    for (const item of data.items) {
+        const productId = Number(item?.productId);
+        const quantity = Number(item?.quantity);
+        const selectedSize = typeof item?.selectedSize === 'string' ? item.selectedSize.trim() : '';
+        if (!Number.isInteger(productId) || productId < 1 || !Number.isInteger(quantity) || quantity < 1) {
+            throw new AppError('El carrito contiene un producto o cantidad inválidos', 400);
+        }
+        const key = `${productId}:${selectedSize}`;
+        const existing = requestedItems.get(key);
+        requestedItems.set(key, { productId, selectedSize, quantity: quantity + (existing?.quantity || 0) });
+    }
+    const lines = [...requestedItems.values()];
+    const productIds = [...new Set(lines.map((item) => item.productId))].sort((left, right) => left - right);
     const connection = await pool.getConnection();
     let orderId;
     try {
         await connection.beginTransaction();
-        const [carts] = await connection.execute('SELECT id FROM carrito WHERE id_usuario = ? FOR UPDATE', [userId]);
-        const cartId = carts[0]?.id;
-        if (!cartId) throw new AppError('El carrito está vacío', 400);
-        const [items] = await connection.execute(
-                `SELECT ci.id_producto AS product_id, ci.talla_seleccionada AS selected_size, ci.cantidad AS quantity,
-                    p.nombre_producto AS name, p.precio_producto AS price, p.stock,
-                    p.estado_producto AS status
-                 FROM detalle_carrito ci JOIN producto p ON p.id_producto = ci.id_producto
-             WHERE ci.id_carrito = ? FOR UPDATE`,
-            [cartId]
+        const placeholders = productIds.map(() => '?').join(',');
+        const [products] = await connection.execute(
+            `SELECT id_producto AS id, nombre_producto AS name, precio_producto AS price,
+                    stock, estado_producto AS status
+             FROM producto WHERE id_producto IN (${placeholders}) ORDER BY id_producto FOR UPDATE`,
+            productIds
         );
-        if (!items.length) throw new AppError('El carrito está vacío', 400);
+        const productById = new Map(products.map((product) => [Number(product.id), product]));
+        const [availableSizes] = await connection.execute(
+            `SELECT id_producto AS product_id, nombre_talla AS name
+             FROM talla WHERE id_producto IN (${placeholders})`,
+            productIds
+        );
+        const sizesByProduct = new Map();
+        for (const size of availableSizes) {
+            const productId = Number(size.product_id);
+            sizesByProduct.set(productId, [...(sizesByProduct.get(productId) || []), size.name]);
+        }
+        const quantitiesByProduct = new Map();
+        const items = lines.map((line) => {
+            const product = productById.get(line.productId);
+            if (!product || product.status !== 'active') {
+                throw new AppError('Uno de los productos ya no está disponible', 409);
+            }
+            const sizes = sizesByProduct.get(line.productId) || [];
+            if (sizes.length && !sizes.includes(line.selectedSize)) {
+                throw new AppError(`Selecciona una talla disponible para ${product.name}`, 400);
+            }
+            quantitiesByProduct.set(line.productId, (quantitiesByProduct.get(line.productId) || 0) + line.quantity);
+            return {
+                product_id: line.productId,
+                selected_size: line.selectedSize,
+                quantity: line.quantity,
+                name: product.name,
+                price: product.price,
+                stock: product.stock,
+                status: product.status,
+            };
+        });
         for (const item of items) {
-            if (item.status !== 'active') throw new AppError(`${item.name} ya no está disponible`, 409);
-            if (Number(item.quantity) > Number(item.stock)) {
+            const requestedQuantity = quantitiesByProduct.get(item.product_id);
+            if (requestedQuantity > Number(item.stock)) {
                 throw new AppError(`Existencias insuficientes para ${item.name}. Disponibles: ${item.stock}`, 409);
             }
         }
@@ -103,18 +147,20 @@ async function createOrder(userId, data) {
                  VALUES (?, ?, ?, ?, ?, ?)`,
                 [orderId, item.product_id, item.name, item.quantity, item.price, item.selected_size || null]
             );
-            await connection.execute(
-                'UPDATE producto SET stock = stock - ? WHERE id_producto = ?',
-                [item.quantity, item.product_id]
+        }
+        for (const [productId, quantity] of quantitiesByProduct) {
+            const [result] = await connection.execute(
+                `UPDATE producto SET stock = stock - ?
+                 WHERE id_producto = ? AND estado_producto = 'active' AND stock >= ?`,
+                [quantity, productId, quantity]
             );
+            if (!result.affectedRows) throw new AppError('El stock cambió durante la compra; revisa tu carrito', 409);
         }
         await connection.execute(
             `INSERT INTO pago (id_pedido, valor_pago, metodo_pago, banco_origen)
              VALUES (?, ?, ?, ?)`,
             [orderId, total, data.paymentMethod, data.paymentMethod === 'pse' ? data.bankName.trim() : null]
         );
-        await connection.execute('DELETE FROM detalle_carrito WHERE id_carrito = ?', [cartId]);
-        await connection.execute('DELETE FROM carrito WHERE id = ?', [cartId]);
         await connection.commit();
     } catch (error) {
         await connection.rollback();

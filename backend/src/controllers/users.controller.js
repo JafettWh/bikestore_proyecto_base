@@ -35,4 +35,13 @@ async function deactivate(req, res, next) {
     }
 }
 
-module.exports = { list, create, update, deactivate };
+async function reactivate(req, res, next) {
+    try {
+        const data = await service.reactivateUser(req.params.id);
+        return res.json({ ok: true, data, message: 'Usuario reactivado exitosamente' });
+    } catch (error) {
+        return next(error);
+    }
+}
+
+module.exports = { list, create, update, deactivate, reactivate };

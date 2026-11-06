@@ -10,7 +10,7 @@ export const ProductDeactivateModal = ({ isOpen, product, onClose, onConfirm, })
     const handleConfirm = async (e) => {
         e.preventDefault();
         if (!reason.trim()) {
-            setError("El motivo de inactivación es obligatorio (Regla de negocio CU-12).");
+            setError("El motivo de inactivación es obligatorio (Regla de negocio).");
             return;
         }
         try {
@@ -28,7 +28,7 @@ export const ProductDeactivateModal = ({ isOpen, product, onClose, onConfirm, })
           <div className="product-deactivate-modal-div-4">
             <Icon name="alert-triangle" size={18}/>
             <h3 className="product-deactivate-modal-h3-1">
-              Inactivar Producto (CU-12)
+              Inactivar Producto
             </h3>
           </div>
           <button onClick={onClose} className="product-deactivate-modal-button-1">

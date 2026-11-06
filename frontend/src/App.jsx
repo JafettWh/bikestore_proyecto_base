@@ -112,16 +112,16 @@ function AppContent() {
     // Guardar o actualizar producto desde el Admin (CU-09, CU-11)
     const handleSaveProduct = async (productData) => {
         const editing = productData.id !== undefined && productData.id !== null;
-        const { imageFile, ...fields } = productData;
+        const { imageFiles = [], ...fields } = productData;
         let body = fields;
-        if (imageFile) {
+        if (imageFiles.length) {
             body = new FormData();
             for (const [key, value] of Object.entries(fields)) {
                 if (value !== undefined && value !== null) {
                     body.append(key, typeof value === "object" ? JSON.stringify(value) : String(value));
                 }
             }
-            body.append("image", imageFile);
+            for (const imageFile of imageFiles) body.append("images", imageFile);
         }
         const { data } = await apiRequest(editing ? `/products/${productData.id}` : "/products", {
             method: editing ? "PUT" : "POST",
@@ -141,6 +141,14 @@ function AppContent() {
             body: { reason },
         });
         setProducts((prev) => prev.map((product) => product.id === data.id ? data : product));
+    };
+    const handleReactivateProduct = async (productId) => {
+        const { data } = await apiRequest(`/products/${productId}/reactivate`, {
+            method: "PATCH",
+            token,
+        });
+        setProducts((prev) => prev.map((product) => product.id === data.id ? data : product));
+        return data;
     };
     if (!isReady) return <main className="api-state">Validando la sesión...</main>;
     return (<MainLayout currentPage={currentPage} onNavigate={handleNavigate} onOpenSearch={() => setIsSearchOpen(true)}>
@@ -163,7 +171,7 @@ function AppContent() {
       {(currentPage === "login" || currentPage === "register" || currentPage === "recovery") && (<AuthPage mode={currentPage} onNavigate={handleNavigate} returnAfterAuth={checkoutAfterAuth ? "checkout" : undefined}/>)}
 
       {currentPage === "admin" && (<ProtectedRoute roles={["admin"]} onDenied={() => handleNavigate("login")}>
-          <AdminDashboardPage orders={orders} products={products} onNavigate={handleNavigate} onSaveProduct={handleSaveProduct} onDeactivateProduct={handleDeactivateProduct}/>
+          <AdminDashboardPage orders={orders} products={products} onNavigate={handleNavigate} onSaveProduct={handleSaveProduct} onDeactivateProduct={handleDeactivateProduct} onReactivateProduct={handleReactivateProduct}/>
         </ProtectedRoute>)}
 
       {/* Modales Globales */}

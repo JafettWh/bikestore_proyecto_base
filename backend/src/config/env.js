@@ -26,6 +26,7 @@ module.exports = {
         secret: process.env.JWT_SECRET,
         expiresIn: process.env.JWT_EXPIRES_IN || '2h'
     },
+    adminCreationPassword: process.env.ADMIN_CREATION_PASSWORD || 'admin123',
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     mail: {
         host: process.env.SMTP_HOST || 'smtp.gmail.com',

@@ -16,7 +16,7 @@ Desde la raíz del repositorio importa el esquema:
 mysql -u root -p < sql\bikestore.sql
 ```
 
-Si ya importaste el esquema anterior y conservas datos, ejecuta las migraciones desde MySQL Workbench una sola vez y en este orden: `sql/migrations/2026-11-05-align-role-product-model.sql`, `sql/migrations/2026-11-05-align-model-attributes.sql`, `sql/migrations/2026-11-05-align-spanish-table-names.sql`, `sql/migrations/2026-11-05-store-temporary-flow-data-only-when-needed.sql`, `sql/migrations/2026-11-06-idempotent-guest-cart-import.sql` y `sql/migrations/2026-11-06-align-spanish-cart-column-names.sql`. Las dos primeras agregan permisos/relaciones y alinean columnas; las siguientes renombran las tablas y eliminan el almacenamiento de carritos visitantes, códigos de recuperación como filas y estados de pago redundantes. La quinta crea el identificador de deduplicación del traspaso y la última traduce los nombres de las columnas del carrito conservando sus datos. La migración de datos temporales elimina los carritos visitantes que existan en la base de datos. No ejecutes estas migraciones sobre una base creada con el SQL actual.
+Si ya importaste el esquema anterior y conservas datos, ejecuta en orden las migraciones `2026-11-05-*`, luego `2026-11-06-*` y finalmente `sql/migrations/2026-11-07-remove-database-cart.sql`. La última elimina definitivamente `detalle_carrito`, `carrito` y la marca de importación; los carritos pasan a guardarse solo en el navegador y el checkout valida el stock en una transacción. No ejecutes migraciones históricas sobre una base creada con el SQL actual.
 
 Configura el backend:
 
@@ -27,7 +27,7 @@ npm install
 npm run dev
 ```
 
-Edita `backend/.env` con el usuario/contraseña MySQL y reemplaza `JWT_SECRET` con una cadena aleatoria de al menos 32 caracteres. El archivo `.env` está ignorado por Git. En el primer inicio se crean los usuarios de prueba indicados por `SEED_*`; cambiar esas variables no altera las contraseñas de usuarios que ya existan en la base.
+Edita `backend/.env` con el usuario/contraseña MySQL y reemplaza `JWT_SECRET` con una cadena aleatoria de al menos 32 caracteres. El archivo `.env` está ignorado por Git. `ADMIN_CREATION_PASSWORD` (valor solicitado para desarrollo: `admin123`) autoriza crear o promover usuarios a administrador; cámbiala antes de compartir o desplegar el entorno. En el primer inicio se crean los usuarios de prueba indicados por `SEED_*`; cambiar esas variables no altera las contraseñas de usuarios que ya existan en la base.
 
 La API escucha en `http://localhost:3000`; comprueba su estado en `GET /api/health`. En desarrollo acepta puertos locales de Vite (por ejemplo, `5173` y `5174`); en producción solo acepta los orígenes definidos en `CORS_ORIGIN`.
 
@@ -64,11 +64,10 @@ Endpoints del flujo: `POST /api/auth/password/forgot`, `POST /api/auth/password/
 | GET | `/api/products`, `/api/products/:id` | Público | Catálogo activo, búsqueda, filtro y detalle |
 | GET | `/api/products/manage` | Admin | Buscar/filtrar todos los productos |
 | POST/PUT | `/api/products`, `/api/products/:id` | Admin | Crear/actualizar producto |
-| PATCH | `/api/products/:id/deactivate` | Admin | Inactivar producto con motivo |
+| PATCH | `/api/products/:id/deactivate`, `/api/products/:id/reactivate` | Admin | Inactivar o reactivar producto |
+| GET | `/api/products/images` | Admin | Listar imágenes guardadas para asignarlas a productos |
 | GET/POST | `/api/admin/users` | Admin | Consultar y crear usuarios |
-| PUT/PATCH | `/api/admin/users/:id` | Admin | Actualizar o inactivar cuentas |
-| GET/POST/PATCH/DELETE | `/api/cart` y `/api/cart/items` | Cliente autenticado | Carrito persistente de clientes |
-| POST | `/api/cart/import` | Cliente autenticado | Transfiere el carrito local del visitante a su cuenta |
+| PUT/PATCH | `/api/admin/users/:id` | Admin | Actualizar, inactivar o reactivar cuentas |
 | GET/POST | `/api/orders/mine`, `/api/orders` | Cliente | Historial y compra con pago simulado |
 | GET | `/api/admin/dashboard`, `/api/admin/dashboard/export` | Admin | Métricas e información para informes |
 
@@ -76,12 +75,12 @@ El pago es simulado: no se almacenan números de tarjeta ni CVV. Las rutas admin
 
 ## Modelo y trazabilidad documental
 
-El esquema implementa usuarios/roles, secciones/categorías, productos, imágenes/tallas, carritos, pedidos/detalles y pagos. Las tablas de entidades usan nombres en español y singular; Producto se relaciona con Sección y Categoría, y Categoría pertenece a Sección. `carrito` y `detalle_carrito` solo se crean para clientes autenticados con productos; el carrito de un visitante vive en `localStorage` y se transfiere al registrarse/iniciar sesión, sin insertar filas temporales de visitantes. Un único identificador de importación en `usuario` hace idempotente el reintento de esa transferencia, sin guardar sus productos como datos de visitante. La fila `usuario` mantiene como máximo un hash temporal de recuperación y se limpia al completar el flujo, sin una tabla de historial. `pago` registra únicamente compras simuladas completadas; el pedido, el pago y la reducción de existencias se confirman juntos en una transacción, por lo que no se reservan existencias en el carrito ni se guarda un estado de pago pendiente/rechazado. Las claves foráneas, restricciones `UNIQUE`, `CHECK`, estados y transacciones protegen unicidad, stock y relaciones. `usuario.contraseña_hash` y el hash de recuperación atienden RNF-05; las claves foráneas y las operaciones transaccionales preservan RNF-06. RF-08 se implementa con carritos persistidos para clientes; RF-30 con JWT y middleware; RF-29 solo permite inactivar cuentas, conforme a la restricción del instructor.
+El esquema implementa usuarios/roles, secciones/categorías, productos, imágenes/tallas, pedidos/detalles y pagos. Los carritos viven en `localStorage` (separados por cuenta) y no reservan existencias; el checkout recibe cantidades, bloquea filas de productos, valida precios/tallas/stock y crea pedido, pago y descuento de stock en una sola transacción. Las claves foráneas, restricciones `UNIQUE`, `CHECK`, estados y transacciones protegen relaciones y stock. Las rutas administrativas siempre requieren JWT de administrador; la contraseña de autorización para asignar el rol admin se valida en el backend.
 
 | Flujo e historias según los archivos HU | CU / RF | Datos y API | Superficie React |
 |---|---|---|---|
 | Catálogo y detalle (HU01–HU02) | CU-01–02; RF-01–04 | `seccion`, `categoria`, `producto`, `imagen`, `talla`; `GET /api/products` | `HomePage`, `ProductDetailPage` |
-| Carrito (HU02, HU07–HU08) y persistencia | CU-06–07; RF-05–08 | `carrito`, `detalle_carrito`; visitante en `localStorage`, `/api/cart` solo para clientes | `CartContext`, catálogo y `CartPage` |
+| Carrito (HU02, HU07–HU08) y persistencia | CU-06–07; RF-05–08 | `localStorage` por cuenta; sin tablas ni endpoints de carrito | `CartContext`, catálogo y `CartPage` |
 | Registro, sesión, recuperación y roles (HU03–HU06) | CU-03–05; RF-13–16, RF-30 | `usuario` (un hash temporal de recuperación), `rol`; `/api/auth/*` | `AuthPage`, `perfilpage` |
 | Compra y pago simulado (HU09) | CU-08; RF-09–12 | `pedido`, `detalle_pedido`, `pago`; `POST /api/orders` | `CheckoutPage` y confirmación de compra |
 | CRUD y búsqueda de productos (HU10–HU13) | CU-09–12; RF-17–20 | `producto` se relaciona con `seccion` y `categoria`; `imagen`, `talla`; `/api/products/*` | `ProductFormModal`, `AdminDashboardPage` |

@@ -38,7 +38,6 @@ CREATE TABLE IF NOT EXISTS usuario (
   codigo_recuperacion_vence DATETIME NULL,
   intentos_recuperacion TINYINT UNSIGNED NOT NULL DEFAULT 0,
   codigo_recuperacion_verificado_en DATETIME NULL,
-  ultimo_carrito_importado_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
   estado_usuario ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -127,28 +126,6 @@ CREATE TABLE IF NOT EXISTS talla (
   nombre_talla VARCHAR(40) NOT NULL,
   UNIQUE KEY uq_product_size (id_producto, nombre_talla),
   CONSTRAINT fk_product_sizes_product FOREIGN KEY (id_producto) REFERENCES producto(id_producto) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS carrito (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  id_usuario BIGINT UNSIGNED NOT NULL UNIQUE,
-  fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  fecha_actualizacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_carts_user FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS detalle_carrito (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  id_carrito BIGINT UNSIGNED NOT NULL,
-  id_producto BIGINT UNSIGNED NOT NULL,
-  talla_seleccionada VARCHAR(40) NOT NULL DEFAULT '',
-  cantidad INT UNSIGNED NOT NULL,
-  fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  fecha_actualizacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_detalle_carrito_producto_talla (id_carrito, id_producto, talla_seleccionada),
-  CONSTRAINT fk_detalle_carrito_carrito FOREIGN KEY (id_carrito) REFERENCES carrito(id) ON DELETE CASCADE,
-  CONSTRAINT fk_detalle_carrito_producto FOREIGN KEY (id_producto) REFERENCES producto(id_producto),
-  CONSTRAINT chk_detalle_carrito_cantidad CHECK (cantidad > 0)
 );
 
 CREATE TABLE IF NOT EXISTS pedido (

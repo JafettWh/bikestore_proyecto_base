@@ -131,6 +131,11 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
                     expiry,
                     cvv,
                     bankName,
+                    items: items.map((item) => ({
+                      productId: item.id,
+                      quantity: item.qty,
+                      selectedSize: item.selectedSize,
+                    })),
                 },
             });
             clearCart();

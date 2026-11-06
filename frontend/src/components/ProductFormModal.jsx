@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import Icon from "./Icon";
 import Button from "./Button";
 import Input from "./Input";
+import { useAuth } from "../hooks/useAuth";
+import { apiRequest } from "../utils/api";
 import "../assets/styles.css";
 
 const categoriesBySection = {
@@ -22,13 +24,29 @@ export const ProductFormModal = ({
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [image, setImage] = useState("");
-  const [imageFile, setImageFile] = useState(null);
+  const [gallery, setGallery] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [availableImages, setAvailableImages] = useState([]);
   const [sizes, setSizes] = useState("");
   const [badge, setBadge] = useState("");
   const [description, setDescription] = useState("");
   // Especificaciones técnicas del producto
   const [technicalSpecs, setTechnicalSpecs] = useState("");
   const [error, setError] = useState("");
+  const { token } = useAuth();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    apiRequest("/products/images", { token })
+      .then(({ data }) => {
+        if (active) setAvailableImages(data);
+      })
+      .catch(() => {
+        if (active) setAvailableImages([]);
+      });
+    return () => { active = false; };
+  }, [isOpen, token]);
 
   useEffect(() => {
     if (productToEdit) {
@@ -38,7 +56,8 @@ export const ProductFormModal = ({
       setPrice(String(productToEdit.price || ""));
       setStock(String(productToEdit.stock ?? ""));
       setImage(productToEdit.image || "");
-      setImageFile(null);
+      setGallery(Array.isArray(productToEdit.gallery) ? productToEdit.gallery : []);
+      setImageFiles([]);
       setSizes(Array.isArray(productToEdit.sizes) ? productToEdit.sizes.join(", ") : "");
       setBadge(productToEdit.badge || "");
       setDescription(productToEdit.description || "");
@@ -62,7 +81,8 @@ export const ProductFormModal = ({
       setPrice("");
       setStock("");
       setImage("");
-      setImageFile(null);
+      setGallery([]);
+      setImageFiles([]);
       setSizes("");
       setBadge("");
       setDescription("");
@@ -95,7 +115,7 @@ export const ProductFormModal = ({
       setError("Las existencias deben ser un número entero mayor o igual a 0.");
       return;
     }
-    if (!image && !imageFile) {
+    if (!image && !imageFiles.length) {
       setError("Selecciona una imagen del producto.");
       return;
     }
@@ -113,7 +133,11 @@ export const ProductFormModal = ({
         price: numPrice,
         stock: numStock,
         image,
-        imageFile,
+        gallery: [...new Set([
+          ...gallery,
+          ...(productToEdit?.image && productToEdit.image !== image ? [productToEdit.image] : []),
+        ])],
+        imageFiles,
         sizes: productSizes,
         badge: badge.trim() || undefined,
         description: description.trim(),
@@ -232,46 +256,34 @@ export const ProductFormModal = ({
             <label className="product-form-modal-label-1">
               Imagen de Muestra
             </label>
-            <select
-              value={image}
-              onChange={(e) => {
-                setImage(e.target.value);
-                setImageFile(null);
-              }}
-              className="product-form-modal-select-1"
-            >
+            <select value={image} onChange={(e) => setImage(e.target.value)} className="product-form-modal-select-1">
               <option value="">Selecciona una imagen</option>
-              <option value="/assets/products/img-005.jpg">
-                img-005 (Specialized Stumpjumper)
-              </option>
-              <option value="/assets/products/img-006.jpg">
-                img-006 (Trek Émonda)
-              </option>
-              <option value="/assets/products/img-007.jpg">
-                img-007 (Canyon Grizl)
-              </option>
-              <option value="/assets/products/img-008.jpg">
-                img-008 (Cannondale Habit)
-              </option>
-              <option value="/assets/products/img-011.jpg">
-                img-011 (Pedales Shimano XT)
-              </option>
-              <option value="/assets/products/img-018.jpg">
-                img-018 (Casco Prevail)
-              </option>
+              {[...new Map([
+                ...availableImages,
+                ...(productToEdit?.image ? [{ url: productToEdit.image, name: productToEdit.image.split("/").pop() }] : []),
+                ...(productToEdit?.gallery || []).map((url) => ({ url, name: url.split("/").pop() })),
+              ].map((option) => [option.url, option])).values()].map((option) => (
+                <option key={option.url} value={option.url}>{option.name}</option>
+              ))}
+            </select>
+            <label className="product-form-modal-label-1" htmlFor="product-gallery">Imágenes adicionales guardadas</label>
+            <select id="product-gallery" multiple size={4} value={gallery} onChange={(event) => setGallery(Array.from(event.target.selectedOptions, (option) => option.value))} className="product-form-modal-select-1">
+              {availableImages.map((option) => <option key={option.url} value={option.url}>{option.name}</option>)}
+              {(productToEdit?.gallery || []).filter((url) => !availableImages.some((option) => option.url === url)).map((url) => <option key={url} value={url}>{url.split("/").pop()}</option>)}
             </select>
             <label className="product-form-modal-label-1" htmlFor="product-image-file">O carga una imagen JPG, PNG o WEBP (máximo 20 MB)</label>
-            <input id="product-image-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => {
-              const file = event.target.files?.[0] || null;
-              if (file && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 20 * 1024 * 1024)) {
-                setError("Selecciona una imagen JPG, PNG o WEBP de máximo 20 MB.");
-                setImageFile(null);
+            <input id="product-image-file" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => {
+              const files = Array.from(event.target.files || []);
+              if (files.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 20 * 1024 * 1024)) {
+                setError("Selecciona imágenes JPG, PNG o WEBP de máximo 20 MB cada una.");
+                setImageFiles([]);
                 event.target.value = "";
                 return;
               }
-              setImageFile(file);
+              setImageFiles(files);
               setError("");
             }} />
+            {imageFiles.length > 0 && <span className="product-form-modal-label-1">{imageFiles.length} imagen(es) nueva(s) seleccionada(s)</span>}
           </div>
 
           <div className="product-form-modal-div-9">

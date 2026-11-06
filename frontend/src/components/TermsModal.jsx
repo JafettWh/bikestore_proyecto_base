@@ -65,7 +65,7 @@ export const TermsModal = ({ isOpen, onClose, onAccept }) => {
           </article>
 
           <article className="terms-modal-section">
-            <h4>2. Registro de Usuario y Seguridad de Credenciales (CU-15 / CU-16)</h4>
+            <h4>2. Registro de Usuario y Seguridad de Credenciales</h4>
             <p>
               El usuario se compromete a proporcionar información veraz, precisa
               y actualizada. La contraseña de acceso debe cumplir con los

@@ -13,13 +13,15 @@ import UserFormModal from "../components/UserFormModal";
 import { asset } from "../config/env";
 import { apiRequest } from "../utils/api";
 import "../assets/styles.css";
-export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onSaveProduct, onDeactivateProduct, }) => {
-    const { currentUser, logout, token, addUser, updateUser, deactivateUser, } = useAuth();
+export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onSaveProduct, onDeactivateProduct, onReactivateProduct, }) => {
+  const { currentUser, logout, token, addUser, updateUser, deactivateUser, reactivateUser, } = useAuth();
     const [activeTab, setActiveTab] = useState("dashboard");
     const [productSearch, setProductSearch] = useState("");
     const [productCategoryFilter, setProductCategoryFilter] = useState("Todas");
     const [productStatusFilter, setProductStatusFilter] = useState("Todos");
     const [userSearch, setUserSearch] = useState("");
+    const [productPage, setProductPage] = useState(1);
+    const [userPage, setUserPage] = useState(1);
     const [salesChartView, setSalesChartView] = useState("days");
     const [salesChartYear, setSalesChartYear] = useState(new Date().getFullYear());
     const [salesChartMonth, setSalesChartMonth] = useState(new Date().getMonth());
@@ -79,47 +81,70 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
     const filteredProducts = managedProducts;
     const filteredUsers = managedUsers;
     const safeUsers = managedUsers;
+    const pageSize = 10;
+    const productPageCount = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+    const userPageCount = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+    const visibleProducts = filteredProducts.slice((productPage - 1) * pageSize, productPage * pageSize);
+    const visibleUsers = filteredUsers.slice((userPage - 1) * pageSize, userPage * pageSize);
 
     useEffect(() => {
+      const controller = new AbortController();
         const query = new URLSearchParams({
             year: String(salesChartYear),
             view: salesChartView,
             section: salesCategory,
             ...(salesChartView === "days" ? { month: String(salesChartMonth + 1) } : {}),
         });
-        apiRequest(`/admin/dashboard?${query}`, { token })
+        apiRequest(`/admin/dashboard?${query}`, { token, signal: controller.signal })
             .then(({ data }) => {
                 setDashboardData(data);
                 setDashboardError("");
             })
-            .catch((error) => setDashboardError(error.message));
+            .catch((error) => {
+              if (!controller.signal.aborted) setDashboardError(error.message);
+            });
+          return () => controller.abort();
     }, [token, salesChartYear, salesChartMonth, salesChartView, salesCategory]);
 
     useEffect(() => {
+      setProductPage(1);
+      const controller = new AbortController();
         const timer = setTimeout(() => {
             const query = new URLSearchParams();
             if (productSearch.trim()) query.set("search", productSearch.trim());
             if (productCategoryFilter !== "Todas") query.set("section", productCategoryFilter);
             if (productStatusFilter !== "Todos") query.set("status", productStatusFilter);
-            apiRequest(`/products/manage${query.size ? `?${query}` : ""}`, { token })
+            apiRequest(`/products/manage${query.size ? `?${query}` : ""}`, { token, signal: controller.signal })
                 .then(({ data }) => setManagedProducts(data))
-                .catch((error) => showNotice(error.message));
+              .catch((error) => {
+                if (!controller.signal.aborted) showNotice(error.message);
+              });
         }, 250);
-        return () => clearTimeout(timer);
+          return () => {
+            clearTimeout(timer);
+            controller.abort();
+          };
     }, [token, productSearch, productCategoryFilter, productStatusFilter]);
 
     useEffect(() => {
+      setUserPage(1);
+      const controller = new AbortController();
         const timer = setTimeout(() => {
             const query = new URLSearchParams();
             if (userSearch.trim()) query.set("search", userSearch.trim());
-            apiRequest(`/admin/users${query.size ? `?${query}` : ""}`, { token })
+            apiRequest(`/admin/users${query.size ? `?${query}` : ""}`, { token, signal: controller.signal })
                 .then(({ data }) => {
                     setManagedUsers(data);
                     if (!userSearch.trim()) setUserCount(data.length);
                 })
-                .catch((error) => showNotice(error.message));
+                .catch((error) => {
+                  if (!controller.signal.aborted) showNotice(error.message);
+                });
         }, 250);
-        return () => clearTimeout(timer);
+            return () => {
+              clearTimeout(timer);
+              controller.abort();
+            };
     }, [token, userSearch]);
 
     const handleExportReport = async (format) => {
@@ -429,8 +454,8 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
               </div>
 
               <span className="admin-dashboard-span-10">
-                Mostrando <strong>{filteredProducts.length}</strong> de{" "}
-                {products.length} productos
+                Mostrando <strong>{visibleProducts.length}</strong> de{" "}
+                {filteredProducts.length} productos filtrados
               </span>
             </div>
 
@@ -447,7 +472,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                   </tr>
                 </thead>
                 <tbody className="admin-dashboard-tbody-1">
-                  {filteredProducts.map((p) => (<tr key={p.id} className="admin-dashboard-tr-2">
+                  {visibleProducts.map((p) => (<tr key={p.id} className="admin-dashboard-tr-2">
                       <td className="admin-dashboard-td-1">
                         <img src={asset(p.image)} alt="" className="admin-dashboard-img-1"/>
                         <div>
@@ -485,11 +510,25 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                         <span>·</span>
                         {p.status === "Activo" ? (<button type="button" onClick={() => setProductToDeactivate(p)} className="admin-dashboard-button-7">
                             Inactivar
-                          </button>) : <span className="admin-dashboard-button-8">Sin reactivación</span>}
+                          </button>) : <button type="button" onClick={async () => {
+                            try {
+                                const updatedProduct = await onReactivateProduct(p.id);
+                                setManagedProducts((previous) => previous.map((product) => product.id === p.id ? updatedProduct : product));
+                                showNotice("Producto reactivado exitosamente.");
+                            } catch (error) {
+                                showNotice(error.message);
+                            }
+                        }} className="admin-dashboard-button-6">Reactivar</button>}
                       </td>
                     </tr>))}
                 </tbody>
               </table>
+            </div>
+            <div className="admin-dashboard-pagination" aria-label="Paginación de productos">
+              <span>{filteredProducts.length ? `${(productPage - 1) * pageSize + 1}-${Math.min(productPage * pageSize, filteredProducts.length)} de ${filteredProducts.length}` : "0 productos"}</span>
+              <button type="button" onClick={() => setProductPage((page) => Math.max(1, page - 1))} disabled={productPage === 1}>Anterior</button>
+              <span>Página {productPage} de {productPageCount}</span>
+              <button type="button" onClick={() => setProductPage((page) => Math.min(productPageCount, page + 1))} disabled={productPage === productPageCount}>Siguiente</button>
             </div>
           </div>)}
 
@@ -544,7 +583,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                     </tr>
                   </thead>
                   <tbody className="admin-dashboard-tbody-1">
-                    {filteredUsers.map((u) => (<tr key={u.id} className="admin-dashboard-tr-2">
+                    {visibleUsers.map((u) => (<tr key={u.id} className="admin-dashboard-tr-2">
                         <td className="admin-dashboard-td-3">
                           {u.name}
                         </td>
@@ -580,11 +619,23 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                         }
                     }} className="admin-dashboard-button-7">
                               Inactivar Cuenta
-                            </button>) : <span className="admin-dashboard-button-8">Cuenta inactiva</span>}
+                        </button>) : (<button type="button" onClick={async () => {
+                      const res = await reactivateUser(u.id);
+                      showNotice(res.message);
+                      if (res.success) {
+                        setManagedUsers((previous) => previous.map((user) => user.id === u.id ? { ...user, status: "Activo" } : user));
+                      }
+                    }} className="admin-dashboard-button-6">Reactivar Cuenta</button>)}
                         </td>
                       </tr>))}
                   </tbody>
                 </table>
+              </div>
+              <div className="admin-dashboard-pagination" aria-label="Paginación de usuarios">
+                <span>{filteredUsers.length ? `${(userPage - 1) * pageSize + 1}-${Math.min(userPage * pageSize, filteredUsers.length)} de ${filteredUsers.length}` : "0 usuarios"}</span>
+                <button type="button" onClick={() => setUserPage((page) => Math.max(1, page - 1))} disabled={userPage === 1}>Anterior</button>
+                <span>Página {userPage} de {userPageCount}</span>
+                <button type="button" onClick={() => setUserPage((page) => Math.min(userPageCount, page + 1))} disabled={userPage === userPageCount}>Siguiente</button>
               </div>
             </div>
           </div>)}

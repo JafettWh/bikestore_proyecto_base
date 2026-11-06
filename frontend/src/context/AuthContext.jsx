@@ -130,6 +130,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const reactivateUser = async (id) => {
+    try {
+      await apiRequest(`/admin/users/${id}/reactivate`, { method: "PATCH", token });
+      await refreshUsers();
+      return { success: true, message: "Usuario reactivado exitosamente." };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  };
+
   const updateProfile = async (data) => {
     try {
       const { user } = await apiRequest("/auth/me", { method: "PATCH", token, body: data });
@@ -154,6 +164,7 @@ export const AuthProvider = ({ children }) => {
         addUser,
         updateUser,
         deactivateUser,
+        reactivateUser,
         updateProfile,
         refreshUsers,
       }}

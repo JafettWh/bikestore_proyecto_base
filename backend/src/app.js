@@ -5,7 +5,6 @@ const env = require('./config/env');
 const authRoutes = require('./routes/auth.routes');
 const productRoutes = require('./routes/products.routes');
 const userRoutes = require('./routes/users.routes');
-const cartRoutes = require('./routes/cart.routes');
 const orderRoutes = require('./routes/orders.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const errorHandler = require('./middlewares/error.middleware');
@@ -32,7 +31,6 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/admin/users', userRoutes);
-app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 

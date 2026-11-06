@@ -234,9 +234,9 @@ Para probar carga de imagen, usa `Body > form-data` en Postman (o la opción equ
 | `price` | Text | `1250000` |
 | `stock` | Text | `8` |
 | `sizes` | Text | `["S","M","L"]` |
-| `image` | File | Selecciona una imagen JPG, PNG o WEBP (máximo 20 MB) |
+| `images` | File | Repite la clave para cargar hasta 10 imágenes JPG, PNG o WEBP (máximo 20 MB cada una) |
 
-El campo de archivo debe llamarse exactamente `image`. Para las tallas, envía un arreglo JSON serializado como texto.
+El campo de archivo debe llamarse exactamente `images`; `image` es la URL de la imagen principal y `gallery` es un arreglo JSON serializado de URLs ya guardadas. Consulta `GET /products/images` con `adminToken` para obtener las rutas reutilizables de `public/assets/products` y `uploads`.
 
 ### Actualizar producto
 
@@ -277,57 +277,16 @@ Content-Type: application/json
 
 No se borra físicamente. Después de inactivarlo, comprueba que ya no aparece en `GET /products` y sí aparece en `GET /products/manage?status=Inactivo`.
 
-## 6. Carrito (cliente autenticado)
-
-Todas estas operaciones requieren `clientToken`.
-
-### Consultar carrito
+Para reactivarlo:
 
 ```http
-GET {{baseUrl}}/cart
-Authorization: Bearer {{clientToken}}
+PATCH {{baseUrl}}/products/{{productId}}/reactivate
+Authorization: Bearer {{adminToken}}
 ```
 
-### Agregar producto
+## 6. Carrito
 
-```http
-POST {{baseUrl}}/cart/items
-Authorization: Bearer {{clientToken}}
-Content-Type: application/json
-```
-
-```json
-{
-  "productId": {{productId}},
-  "quantity": 2,
-  "selectedSize": "M"
-}
-```
-
-`selectedSize` debe coincidir con una talla configurada para el producto. Si el producto no tiene tallas, puede omitirse. La respuesta incluye el carrito en `data`; guarda el `cartItemId` del elemento para las siguientes pruebas. Si la cantidad solicitada supera el stock, puede ajustarse al stock y la respuesta incluye `adjusted: true`.
-
-### Actualizar cantidad
-
-```http
-PATCH {{baseUrl}}/cart/items/{{cartItemId}}
-Authorization: Bearer {{clientToken}}
-Content-Type: application/json
-```
-
-```json
-{ "quantity": 1 }
-```
-
-La cantidad debe ser un entero positivo y no superar el stock disponible.
-
-### Quitar un producto del carrito
-
-```http
-DELETE {{baseUrl}}/cart/items/{{cartItemId}}
-Authorization: Bearer {{clientToken}}
-```
-
-El carrito de visitantes del frontend se guarda localmente; esta API de carrito solo acepta usuarios autenticados con rol de cliente.
+El carrito se guarda en `localStorage` del frontend y no tiene endpoints ni tablas en MySQL. Para probar el checkout directamente con la API, envía los IDs, cantidades y tallas en `items`; el servidor valida disponibilidad y precios desde la base de datos, sin confiar en valores del cliente.
 
 ## 7. Pedidos y pago simulado
 
@@ -355,7 +314,10 @@ Ejemplo de pago simulado con tarjeta (el número de prueba pasa Luhn; no uses un
   "paymentMethod": "card",
   "cardNumber": "4111111111111111",
   "expiry": "12/30",
-  "cvv": "123"
+  "cvv": "123",
+  "items": [
+    { "productId": {{productId}}, "quantity": 2, "selectedSize": "M" }
+  ]
 }
 ```
 
@@ -371,7 +333,10 @@ Alternativa PSE:
   "city": "Cali",
   "department": "Valle del Cauca",
   "paymentMethod": "pse",
-  "bankName": "Bancolombia"
+  "bankName": "Bancolombia",
+  "items": [
+    { "productId": {{productId}}, "quantity": 1 }
+  ]
 }
 ```
 
@@ -414,7 +379,7 @@ Content-Type: application/json
 }
 ```
 
-`role` debe ser `cliente` o `admin`; la contraseña debe tener al menos ocho caracteres.
+`role` debe ser `cliente` o `admin`; la contraseña debe tener al menos ocho caracteres. Al crear un admin (o promover un usuario), agrega `"adminPassword": "admin123"` por defecto local; el valor real del servidor se configura con `ADMIN_CREATION_PASSWORD`. Todas las rutas siguen requiriendo el JWT de un administrador autenticado.
 
 ### Actualizar usuario
 
@@ -443,6 +408,13 @@ Authorization: Bearer {{adminToken}}
 
 No hay borrado físico de usuarios. El sistema impide inactivar o degradar al último administrador activo.
 
+Reactivar una cuenta inactiva:
+
+```http
+PATCH {{baseUrl}}/admin/users/{{userId}}/reactivate
+Authorization: Bearer {{adminToken}}
+```
+
 ## 9. Dashboard administrativo
 
 Requiere `adminToken`.
@@ -467,7 +439,6 @@ Prueba también estas respuestas esperadas para verificar validaciones y permiso
 
 | Prueba | Resultado esperado |
 |---|---|
-| Llamar a `/cart` sin token | `401` |
 | Usar un token de cliente en `/products/manage` o `/admin/users` | `403` |
 | Enviar token inválido o expirado | `401` |
 | Registrar un correo ya existente | `409` |
@@ -475,8 +446,8 @@ Prueba también estas respuestas esperadas para verificar validaciones y permiso
 | Crear producto con precio no positivo, stock negativo o categoría inexistente | `400` |
 | Crear producto sin imagen | `400` |
 | Enviar archivo distinto de JPG/PNG/WEBP o mayor de 20 MB | `400` |
-| Agregar cantidad no entera o mayor que el stock al carrito | Rechazo o ajuste explícito al stock |
-| Comprar con carrito vacío o sin stock suficiente | `400` o `409` |
+| Crear o promover admin sin `adminPassword` correcta | `403` |
+| Comprar sin `items`, con talla no configurada o sin stock suficiente | `400` o `409` |
 | Enviar tarjeta que no pasa Luhn, vencida o CVV que no tenga 3 dígitos | `400` |
 | Enviar motivo vacío al inactivar un producto | `400` |
 

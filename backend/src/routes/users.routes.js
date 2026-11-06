@@ -8,5 +8,6 @@ router.get('/', controller.list);
 router.post('/', controller.create);
 router.put('/:id', controller.update);
 router.patch('/:id/deactivate', controller.deactivate);
+router.patch('/:id/reactivate', controller.reactivate);
 
 module.exports = router;

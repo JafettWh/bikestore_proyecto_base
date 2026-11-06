@@ -1,98 +1,79 @@
-import { createContext, useEffect, useRef, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { apiRequest } from "../utils/api";
 
 export const CartContext = createContext(undefined);
 
-function readGuestCart() {
-  const saved = localStorage.getItem("bikestore_cart");
+function readCart(key) {
+  const saved = localStorage.getItem(key);
   if (!saved) return [];
   try {
     const items = JSON.parse(saved);
     return Array.isArray(items) ? items : [];
   } catch {
-    localStorage.removeItem("bikestore_cart");
-    localStorage.removeItem("bikestore_cart_import_id");
+    localStorage.removeItem(key);
     return [];
   }
 }
 
-export const CartProvider = ({ children }) => {
-  const { currentUser, token, isReady: authReady } = useAuth();
-  const [items, setItems] = useState(readGuestCart);
-  const [cartError, setCartError] = useState("");
-  const syncInProgress = useRef(null);
-  const previousToken = useRef(token);
+function cartKeyFor(user) {
+  return user?.role === "cliente" ? `bikestore_cart_user_${user.id}` : "bikestore_cart";
+}
 
-  const syncCart = async (accessToken = token, role = currentUser?.role) => {
-    if (!accessToken) {
-      setItems(readGuestCart());
-      return;
+function mergeCartItems(savedItems, guestItems) {
+  const merged = new Map(savedItems.map((item) => [item.cartItemId, item]));
+  for (const guestItem of guestItems) {
+    const saved = merged.get(guestItem.cartItemId);
+    if (!saved) {
+      merged.set(guestItem.cartItemId, guestItem);
+      continue;
     }
-    if (!authReady && accessToken === token) return;
-    if (role !== "cliente") {
+    const requestedQty = Number(saved.qty) + Number(guestItem.qty);
+    merged.set(guestItem.cartItemId, {
+      ...saved,
+      qty: Math.min(requestedQty, Number(saved.stock)),
+    });
+  }
+  return [...merged.values()];
+}
+
+export const CartProvider = ({ children }) => {
+  const { currentUser, isReady: authReady } = useAuth();
+  const [items, setItems] = useState(() => readCart("bikestore_cart"));
+  const [cartError, setCartError] = useState("");
+  const [storageKey, setStorageKey] = useState("bikestore_cart");
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (currentUser?.role === "admin") {
       setItems([]);
       setCartError("");
+      setStorageKey("");
       return;
     }
-    if (syncInProgress.current?.token === accessToken) return syncInProgress.current.promise;
-
-    const promise = (async () => {
-      const guestItems = readGuestCart();
-      if (guestItems.length) {
-        const importId = localStorage.getItem("bikestore_cart_import_id") || crypto.randomUUID();
-        localStorage.setItem("bikestore_cart_import_id", importId);
-        const { adjusted, skipped } = await apiRequest("/cart/import", {
-          method: "POST",
-          token: accessToken,
-          body: {
-            importId,
-            items: guestItems.map(({ id, qty, selectedSize }) => ({
-              productId: id,
-              quantity: qty,
-              selectedSize,
-            })),
-          },
-        });
-        localStorage.removeItem("bikestore_cart");
-        localStorage.removeItem("bikestore_cart_import_id");
-        setCartError(skipped
-          ? `Se omitieron ${skipped} producto(s) del carrito porque ya no están disponibles.`
-          : adjusted
-            ? "Se ajustaron las cantidades del carrito al stock disponible."
-            : "");
-      } else {
-        localStorage.removeItem("bikestore_cart");
-        localStorage.removeItem("bikestore_cart_import_id");
-        setCartError("");
-      }
-
-      const { data } = await apiRequest("/cart", { token: accessToken });
-      setItems(data);
-    })();
-    syncInProgress.current = { token: accessToken, promise };
-
-    try {
-      await promise;
-    } finally {
-      if (syncInProgress.current?.promise === promise) syncInProgress.current = null;
+    const userCartKey = cartKeyFor(currentUser);
+    const savedItems = readCart(userCartKey);
+    if (currentUser?.role === "cliente") {
+      const guestItems = readCart("bikestore_cart");
+      const mergedItems = mergeCartItems(savedItems, guestItems);
+      localStorage.removeItem("bikestore_cart");
+      localStorage.setItem(userCartKey, JSON.stringify(mergedItems));
+      setItems(mergedItems);
+      setCartError("");
+    } else {
+      setItems(savedItems);
     }
+    setStorageKey(userCartKey);
+  }, [authReady, currentUser?.id, currentUser?.role]);
+
+  useEffect(() => {
+    if (authReady && storageKey) localStorage.setItem(storageKey, JSON.stringify(items));
+  }, [items, storageKey, authReady]);
+
+  const syncCart = async () => {
+    const key = cartKeyFor(currentUser);
+    setStorageKey(key);
+    setItems(readCart(key));
   };
-
-  useEffect(() => {
-    if (authReady) {
-      syncCart().catch((error) => setCartError(error.message));
-    }
-  }, [authReady, token, currentUser?.id]);
-
-  useEffect(() => {
-    if (previousToken.current !== token) {
-      if (previousToken.current && !token) setItems(readGuestCart());
-      previousToken.current = token;
-      return;
-    }
-    if (!token) localStorage.setItem("bikestore_cart", JSON.stringify(items));
-  }, [items, token]);
 
   const addItem = async (product, quantity = 1, selectedSize) => {
     if (!Number.isInteger(Number(quantity)) || Number(quantity) < 1) {
@@ -102,50 +83,29 @@ export const CartProvider = ({ children }) => {
       return { success: false, message: "El producto no tiene existencias." };
     }
 
-    if (!token) {
-      if (product.sizes?.length && !product.sizes.includes(selectedSize)) {
-        return { success: false, message: "Selecciona una talla disponible." };
-      }
-      const size = selectedSize || "";
-      const existing = items.find((item) => item.id === product.id && (item.selectedSize || "") === size);
-      const requestedQuantity = Number(existing?.qty || 0) + Number(quantity);
-      const updatedQuantity = Math.min(requestedQuantity, Number(product.stock));
-      const guestItem = {
-        ...product,
-        cartItemId: `${product.id}:${size}`,
-        qty: updatedQuantity,
-        selectedSize: size || undefined,
-      };
-      localStorage.removeItem("bikestore_cart_import_id");
-      setItems((current) => existing
-        ? current.map((item) => item.cartItemId === guestItem.cartItemId ? guestItem : item)
-        : [...current, guestItem]);
-      return {
-        success: true,
-        message: updatedQuantity < requestedQuantity
-          ? `La cantidad se ajustó al stock disponible (${product.stock}).`
-          : `${product.name} agregado al carrito.`,
-      };
+    if (product.sizes?.length && !product.sizes.includes(selectedSize)) {
+      return { success: false, message: "Selecciona una talla disponible." };
     }
-
-    try {
-      const { data, adjusted } = await apiRequest("/cart/items", {
-        method: "POST",
-        token,
-        body: { productId: product.id, quantity, selectedSize },
-      });
-      setItems(data);
-      setCartError("");
-      return {
-        success: true,
-        message: adjusted
-          ? `La cantidad se ajustó al stock disponible (${product.stock}).`
-          : `${product.name} agregado al carrito.`,
-      };
-    } catch (error) {
-      setCartError(error.message);
-      return { success: false, message: error.message };
-    }
+    const size = selectedSize || "";
+    const cartItemId = `${product.id}:${size}`;
+    const existing = items.find((item) => item.cartItemId === cartItemId);
+    const requestedQuantity = Number(existing?.qty || 0) + Number(quantity);
+    const updatedQuantity = Math.min(requestedQuantity, Number(product.stock));
+    const cartItem = {
+      ...product,
+      cartItemId,
+      qty: updatedQuantity,
+      selectedSize: size || undefined,
+    };
+    setItems((current) => existing
+      ? current.map((item) => item.cartItemId === cartItemId ? cartItem : item)
+      : [...current, cartItem]);
+    return {
+      success: true,
+      message: updatedQuantity < requestedQuantity
+        ? `La cantidad se ajustó al stock disponible (${product.stock}).`
+        : `${product.name} agregado al carrito.`,
+    };
   };
 
   const updateQty = async (id, delta) => {
@@ -154,48 +114,17 @@ export const CartProvider = ({ children }) => {
     const quantity = target.qty + delta;
     if (quantity < 1) return { success: false, message: "La cantidad mínima es una unidad." };
     if (quantity > target.stock) return { success: false, message: `Máximo disponible: ${target.stock} unidades.` };
-    if (!token) {
-      localStorage.removeItem("bikestore_cart_import_id");
-      setItems((current) => current.map((item) => item.cartItemId === id ? { ...item, qty: quantity } : item));
-      return { success: true };
-    }
-    try {
-      const { data } = await apiRequest(`/cart/items/${id}`, {
-        method: "PATCH",
-        token,
-        body: { quantity },
-      });
-      setItems(data);
-      setCartError("");
-      return { success: true };
-    } catch (error) {
-      setCartError(error.message);
-      return { success: false, message: error.message };
-    }
+    setItems((current) => current.map((item) => item.cartItemId === id ? { ...item, qty: quantity } : item));
+    return { success: true };
   };
 
   const removeItem = async (id) => {
-    if (!token) {
-      localStorage.removeItem("bikestore_cart_import_id");
-      setItems((current) => current.filter((item) => item.cartItemId !== id));
-      return { success: true };
-    }
-    try {
-      const { data } = await apiRequest(`/cart/items/${id}`, { method: "DELETE", token });
-      setItems(data);
-      setCartError("");
-      return { success: true };
-    } catch (error) {
-      setCartError(error.message);
-      return { success: false, message: error.message };
-    }
+    setItems((current) => current.filter((item) => item.cartItemId !== id));
+    return { success: true };
   };
 
   const clearCart = () => {
-    if (!token) {
-      localStorage.removeItem("bikestore_cart");
-      localStorage.removeItem("bikestore_cart_import_id");
-    }
+    if (storageKey) localStorage.removeItem(storageKey);
     setItems([]);
   };
   const subtotal = items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);

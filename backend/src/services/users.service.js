@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const pool = require('../config/db');
 const AppError = require('../utils/AppError');
 const { publicUser } = require('./auth.service');
+const env = require('../config/env');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -39,6 +40,9 @@ async function listUsers({ search = '', status = '' } = {}) {
 
 async function createUser(data) {
     const fields = validateUserFields(data);
+    if (fields.role === 'admin' && data.adminPassword !== env.adminCreationPassword) {
+        throw new AppError('La contraseña de autorización admin es incorrecta', 403);
+    }
     if (typeof data.password !== 'string' || data.password.length < 8) {
         throw new AppError('La contraseña debe tener mínimo 8 caracteres', 400);
     }
@@ -69,6 +73,9 @@ async function updateUser(id, data) {
         );
         const target = users[0];
         if (!target) throw new AppError('Usuario no encontrado', 404);
+        if (fields.role === 'admin' && target.role !== 'admin' && data.adminPassword !== env.adminCreationPassword) {
+            throw new AppError('La contraseña de autorización admin es incorrecta', 403);
+        }
         if (target.status === 'active' && target.role === 'admin' && fields.role !== 'admin') {
             const [admins] = await connection.execute(
                 `SELECT u.id_usuario AS id FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
@@ -128,4 +135,14 @@ async function deactivateUser(id) {
     return results.find((user) => user.id === Number(id));
 }
 
-module.exports = { listUsers, createUser, updateUser, deactivateUser };
+async function reactivateUser(id) {
+    const [result] = await pool.execute(
+        "UPDATE usuario SET estado_usuario = 'active' WHERE id_usuario = ? AND estado_usuario = 'inactive'",
+        [id]
+    );
+    if (!result.affectedRows) throw new AppError('Usuario inactivo no encontrado', 404);
+    const results = await listUsers();
+    return results.find((user) => user.id === Number(id));
+}
+
+module.exports = { listUsers, createUser, updateUser, deactivateUser, reactivateUser };

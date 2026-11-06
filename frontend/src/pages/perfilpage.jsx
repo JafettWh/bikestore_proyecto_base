@@ -214,8 +214,8 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
           </div>
         </div>
 
-        <div className="perfil-hero-actions">
-          {!isEditing ? (
+        {!isEditing && (
+          <div className="perfil-hero-actions">
             <Button
               type="button"
               variant="primary"
@@ -226,29 +226,8 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
             >
               Editar Perfil
             </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="md"
-                onClick={handleCancelEdit}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="md"
-                onClick={handleSaveChanges}
-                icon={<Icon name="check" size={16} />}
-                iconPosition="left"
-              >
-                Guardar Cambios
-              </Button>
-            </div>
-          )}
         </div>
+      )}
       </section>
 
       {/* Grid de Formulario / Información Detallada */}

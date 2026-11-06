@@ -25,10 +25,10 @@ function fileFilter(req, file, cb) {
     return cb(null, true);
 }
 
-const uploadProductImage = multer({
+const uploadProductImages = multer({
     storage,
     fileFilter,
     limits: { fileSize: MAX_SIZE }
-}).single('image');
+}).array('images', 10);
 
-module.exports = { uploadProductImage, UPLOAD_DIR };
+module.exports = { uploadProductImages, UPLOAD_DIR };

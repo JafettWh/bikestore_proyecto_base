@@ -100,9 +100,7 @@ export const ProductDetailPage = ({ product, onAddToCart, onNavigate, }) => {
                 <span className="product-detail-span-8">
                   Selecciona tu talla:
                 </span>
-                <span className="product-detail-span-9">
-                  Guía de medidas anatómicas
-                </span>
+    
               </div>
               <div className="product-detail-div-12">
                 {product.sizes.map((s) => (<button key={s} type="button" onClick={() => setSelectedSize(s)} className={`product-detail-button-4 ${selectedSize === s

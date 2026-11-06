@@ -3,6 +3,7 @@ const path = require('path');
 const pool = require('../config/db');
 const AppError = require('../utils/AppError');
 const UPLOAD_DIR = path.join(__dirname, '../../uploads');
+const PUBLIC_PRODUCTS_DIR = path.join(__dirname, '../../../frontend/public/assets/products');
 
 function mapProduct(row) {
     return {
@@ -47,13 +48,37 @@ function arrayValue(value) {
     }
 }
 
-async function removeUploadedFile(fileName) {
-    if (!fileName) return;
-    try {
-        await fs.unlink(path.join(UPLOAD_DIR, fileName));
-    } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
+async function removeUploadedFiles(fileNames = []) {
+    for (const fileName of fileNames) {
+        if (!fileName) continue;
+        try {
+            await fs.unlink(path.join(UPLOAD_DIR, fileName));
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+        }
     }
+}
+
+async function listAvailableImages() {
+    const sources = [
+        { directory: PUBLIC_PRODUCTS_DIR, prefix: '/assets/products/' },
+        { directory: UPLOAD_DIR, prefix: '/uploads/' }
+    ];
+    const images = [];
+    for (const source of sources) {
+        let files = [];
+        try {
+            files = await fs.readdir(source.directory, { withFileTypes: true });
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+        }
+        for (const file of files) {
+            if (file.isFile() && /\.(jpe?g|png|webp)$/i.test(file.name)) {
+                images.push({ url: `${source.prefix}${file.name}`, name: file.name });
+            }
+        }
+    }
+    return images.sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function validateProduct(data) {
@@ -172,14 +197,16 @@ async function listCategories() {
     return rows.map((row) => ({ id: row.id, name: row.name, section: row.section }));
 }
 
-async function createProduct(data, fileName) {
+async function createProduct(data, fileNames = []) {
     let connection;
     let committed = false;
     let productId;
     try {
         const validated = validateProduct(data);
         const { categoryId, sectionId } = await categoryIdFor(data.section, data.category);
-        const image = fileName ? `/uploads/${fileName}` : (data.image || null);
+        const uploadedImages = fileNames.map((fileName) => `/uploads/${fileName}`);
+        const requestedImages = [...new Set([...arrayValue(data.gallery), ...uploadedImages])];
+        const image = data.image || uploadedImages[0] || requestedImages[0] || null;
         if (!image) throw new AppError('La imagen del producto es obligatoria', 400);
         connection = await pool.getConnection();
         await connection.beginTransaction();
@@ -201,8 +228,8 @@ async function createProduct(data, fileName) {
             ]
         );
         productId = result.insertId;
-        for (const [position, imageUrl] of arrayValue(data.gallery).entries()) {
-            if (imageUrl && imageUrl !== image) {
+        for (const [position, imageUrl] of requestedImages.filter((url) => url && url !== image).entries()) {
+            if (imageUrl) {
                 await connection.execute(
                     'INSERT INTO imagen (id_producto, url_imagen, position) VALUES (?, ?, ?)',
                     [productId, imageUrl, position]
@@ -218,7 +245,7 @@ async function createProduct(data, fileName) {
         committed = true;
     } catch (error) {
         if (connection && !committed) await connection.rollback();
-        if (!committed) await removeUploadedFile(fileName);
+        if (!committed) await removeUploadedFiles(fileNames);
         throw error;
     } finally {
         if (connection) connection.release();
@@ -226,7 +253,7 @@ async function createProduct(data, fileName) {
     return getProduct(productId, true);
 }
 
-async function updateProduct(id, data, fileName) {
+async function updateProduct(id, data, fileNames = []) {
     let connection;
     let committed = false;
     try {
@@ -234,7 +261,12 @@ async function updateProduct(id, data, fileName) {
         const merged = { ...current, ...data };
         const validated = validateProduct(merged);
         const { categoryId, sectionId } = await categoryIdFor(merged.section, merged.category);
-        const image = fileName ? `/uploads/${fileName}` : (data.image ?? current.image);
+        const image = data.image || fileNames[0] && `/uploads/${fileNames[0]}` || current.image;
+        const galleryChanged = data.gallery !== undefined || fileNames.length > 0;
+        const updatedGallery = [...new Set([
+            ...arrayValue(data.gallery),
+            ...fileNames.map((fileName) => `/uploads/${fileName}`)
+        ])].filter((url) => url && url !== image);
         connection = await pool.getConnection();
         await connection.beginTransaction();
         await connection.execute(
@@ -263,11 +295,20 @@ async function updateProduct(id, data, fileName) {
                 }
             }
         }
+        if (galleryChanged) {
+            await connection.execute('DELETE FROM imagen WHERE id_producto = ?', [id]);
+            for (const [position, imageUrl] of updatedGallery.entries()) {
+                await connection.execute(
+                    'INSERT INTO imagen (id_producto, url_imagen, position) VALUES (?, ?, ?)',
+                    [id, imageUrl, position]
+                );
+            }
+        }
         await connection.commit();
         committed = true;
     } catch (error) {
         if (connection && !committed) await connection.rollback();
-        if (!committed) await removeUploadedFile(fileName);
+        if (!committed) await removeUploadedFiles(fileNames);
         throw error;
     } finally {
         if (connection) connection.release();
@@ -286,4 +327,14 @@ async function deactivateProduct(id, reason) {
     return getProduct(id, true);
 }
 
-module.exports = { listProducts, getProduct, listCategories, createProduct, updateProduct, deactivateProduct };
+async function reactivateProduct(id) {
+    const [result] = await pool.execute(
+        `UPDATE producto SET estado_producto = 'active', motivo_inactivacion = NULL
+         WHERE id_producto = ? AND estado_producto = 'inactive'`,
+        [id]
+    );
+    if (!result.affectedRows) throw new AppError('Producto inactivo no encontrado', 404);
+    return getProduct(id, true);
+}
+
+module.exports = { listProducts, getProduct, listCategories, listAvailableImages, createProduct, updateProduct, deactivateProduct, reactivateProduct };

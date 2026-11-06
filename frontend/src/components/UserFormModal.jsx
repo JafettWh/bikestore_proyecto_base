@@ -10,6 +10,7 @@ export const UserFormModal = ({ isOpen, onClose, userToEdit, onSave }) => {
   const [role, setRole] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -19,11 +20,13 @@ export const UserFormModal = ({ isOpen, onClose, userToEdit, onSave }) => {
     setRole(userToEdit?.role || "");
     setPassword("");
     setConfirmPassword("");
+    setAdminPassword("");
     setError("");
   }, [userToEdit, isOpen]);
 
   if (!isOpen) return null;
   const isCreation = !userToEdit;
+  const requiresAdminPassword = role === "admin" && (!userToEdit || userToEdit.role !== "admin");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -40,6 +43,10 @@ export const UserFormModal = ({ isOpen, onClose, userToEdit, onSave }) => {
       setError("Las contraseñas no coinciden.");
       return;
     }
+    if (requiresAdminPassword && !adminPassword) {
+      setError("Ingresa la contraseña de autorización para crear un administrador.");
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -48,6 +55,7 @@ export const UserFormModal = ({ isOpen, onClose, userToEdit, onSave }) => {
         email: email.trim(),
         role,
         ...(isCreation ? { password } : {}),
+        ...(role === "admin" ? { adminPassword } : {}),
       });
       if (result !== true) {
         setError(result?.message || "No fue posible guardar el usuario.");
@@ -66,7 +74,7 @@ export const UserFormModal = ({ isOpen, onClose, userToEdit, onSave }) => {
       <div className="user-form-modal-div-2" onClick={(event) => event.stopPropagation()}>
         <div className="user-form-modal-div-3">
           <h3 className="user-form-modal-h3-1">
-            {isCreation ? "Crear Nuevo Usuario (CU-15)" : "Editar Usuario (CU-16)"}
+            {isCreation ? "Crear Nuevo Usuario" : "Editar Usuario"}
           </h3>
           <button type="button" onClick={onClose} className="user-form-modal-button-1" aria-label="Cerrar modal">
             <Icon name="close" size={20} />
@@ -84,6 +92,9 @@ export const UserFormModal = ({ isOpen, onClose, userToEdit, onSave }) => {
               <option value="admin">Administrador</option>
             </select>
           </div>
+          {requiresAdminPassword && (
+            <Input label="Contraseña de autorización admin" type="password" required autoComplete="off" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} />
+          )}
           {isCreation && (
             <div className="user-form-modal-security-box">
               <div className="user-form-modal-security-header">

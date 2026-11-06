@@ -32,9 +32,17 @@ async function categories(req, res, next) {
     }
 }
 
+async function availableImages(req, res, next) {
+    try {
+        return res.json({ ok: true, data: await service.listAvailableImages() });
+    } catch (error) {
+        return next(error);
+    }
+}
+
 async function create(req, res, next) {
     try {
-        const data = await service.createProduct(req.body, req.file?.filename);
+        const data = await service.createProduct(req.body, (req.files || []).map((file) => file.filename));
         return res.status(201).json({ ok: true, data });
     } catch (error) {
         return next(error);
@@ -43,7 +51,7 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
     try {
-        const data = await service.updateProduct(req.params.id, req.body, req.file?.filename);
+        const data = await service.updateProduct(req.params.id, req.body, (req.files || []).map((file) => file.filename));
         return res.json({ ok: true, data });
     } catch (error) {
         return next(error);
@@ -59,4 +67,13 @@ async function deactivate(req, res, next) {
     }
 }
 
-module.exports = { list, listManaged, getById, categories, create, update, deactivate };
+async function reactivate(req, res, next) {
+    try {
+        const data = await service.reactivateProduct(req.params.id);
+        return res.json({ ok: true, data, message: 'Producto reactivado exitosamente' });
+    } catch (error) {
+        return next(error);
+    }
+}
+
+module.exports = { list, listManaged, getById, categories, availableImages, create, update, deactivate, reactivate };

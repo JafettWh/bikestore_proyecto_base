@@ -96,29 +96,7 @@ export const Footer = ({ onNavigate }) => {
             </ul>
           </div>
 
-          {/* Columna 4: Boletín y Proyecto SENA */}
-          <div>
-            <h4 className="footer-h4-1">
-              Comunidad BikeStore
-            </h4>
-            <p className="footer-p-2">
-              Suscríbete para recibir invitaciones a rodadas de fin de semana, lanzamientos y descuentos exclusivos.
-            </p>
-            <form onSubmit={(e) => {
-            e.preventDefault();
-            alert("¡Gracias por unirte al pelotón BikeStore!");
-        }} className="footer-form-1">
-              <input type="email" required placeholder="tu@correo.com" className="footer-input-1"/>
-              <button type="submit" aria-label="Suscribirse" className="footer-button-2">
-                <Icon name="arrow" size={16}/>
-              </button>
-            </form>
-            <div className="footer-div-5">
-              BikeStore Colombia · Pasión y rendimiento en cada kilómetro rodado.
-            </div>
-          </div>
         </div>
-
         {/* Barra Inferior de Copyright */}
         <div className="footer-div-6">
           <p>© 2026 BikeStore Colombia. Desarrollado con arquitectura limpia en React.</p>
