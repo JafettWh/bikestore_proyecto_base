@@ -1,10 +1,45 @@
-# Pruebas de API BikeStore con Postman o RapidAPI Client
+﻿# Pruebas de API BikeStore con Postman o RapidAPI Client
 
 Guía de referencia para probar manualmente la API REST local. Los ejemplos usan JSON, salvo las operaciones de imagen de producto, que usan `multipart/form-data`.
 
 > Ejecuta estas pruebas únicamente contra una instancia local o un entorno para el que tengas autorización. Los pagos son simulados: no envíes datos de tarjetas reales.
 
+## Guía rápida: método y URL
+
+Las URLs ya incluyen `http://localhost:3000/api`; no necesitas crear una variable `baseUrl`. Cuando una URL incluya `{{productId}}` o `{{userId}}`, reemplaza el marcador por el ID real de una respuesta anterior.
+
+| Prueba | Método | URL | Autenticación |
+|---|---|---|---|
+| Comprobar que la API responde | `GET` | `http://localhost:3000/api/health` | No |
+| Iniciar sesión | `POST` | `http://localhost:3000/api/auth/login` | No |
+| Registrar un cliente | `POST` | `http://localhost:3000/api/auth/register` | No |
+| Ver mi perfil | `GET` | `http://localhost:3000/api/auth/me` | Cliente o admin |
+| Actualizar mi perfil | `PATCH` | `http://localhost:3000/api/auth/me` | Cliente o admin |
+| Solicitar recuperación de contraseña | `POST` | `http://localhost:3000/api/auth/password/forgot` | No |
+| Verificar código de recuperación | `POST` | `http://localhost:3000/api/auth/password/verify` | No |
+| Cambiar contraseña | `POST` | `http://localhost:3000/api/auth/password/reset` | No |
+| Listar productos | `GET` | `http://localhost:3000/api/products` | No |
+| Consultar un producto | `GET` | `http://localhost:3000/api/products/{{productId}}` | No |
+| Listar categorías | `GET` | `http://localhost:3000/api/products/categories` | No |
+| Ver imágenes disponibles | `GET` | `http://localhost:3000/api/products/images` | Admin |
+| Listar productos de administración | `GET` | `http://localhost:3000/api/products/manage?search=bici&status=Activo` | Admin |
+| Crear producto | `POST` | `http://localhost:3000/api/products` | Admin |
+| Actualizar producto | `PUT` | `http://localhost:3000/api/products/{{productId}}` | Admin |
+| Inactivar / reactivar producto | `PATCH` | `http://localhost:3000/api/products/{{productId}}/deactivate` / `http://localhost:3000/api/products/{{productId}}/reactivate` | Admin |
+| Crear pedido | `POST` | `http://localhost:3000/api/orders` | Cliente |
+| Ver mis pedidos | `GET` | `http://localhost:3000/api/orders/mine` | Cliente o admin |
+| Listar usuarios | `GET` | `http://localhost:3000/api/admin/users?search=cliente&status=Activo` | Admin |
+| Crear usuario | `POST` | `http://localhost:3000/api/admin/users` | Admin |
+| Actualizar usuario | `PUT` | `http://localhost:3000/api/admin/users/{{userId}}` | Admin |
+| Inactivar / reactivar usuario | `PATCH` | `http://localhost:3000/api/admin/users/{{userId}}/deactivate` / `http://localhost:3000/api/admin/users/{{userId}}/reactivate` | Admin |
+| Consultar dashboard | `GET` | `http://localhost:3000/api/admin/dashboard?year=2026&month=11&view=days` | Admin |
+| Exportar dashboard | `GET` | `http://localhost:3000/api/admin/dashboard/export?year=2026&month=11&view=days` | Admin |
+
+Para cualquier ruta protegida, usa `Authorization: Bearer {{token}}`. Guarda en `token` el JWT que devuelve el inicio de sesión del rol requerido. No existe una consulta administrativa de usuario por ID: `GET /api/admin/users` lista usuarios y `GET /api/auth/me` devuelve el perfil del usuario autenticado.
+
 ## 1. Preparar el entorno
+
+Si ya tenías creada la base de datos antes del cambio de `badge` a `etiqueta`, ejecuta una sola vez `sql/migrations/2026-11-08-rename-badge-to-etiqueta.sql` en MySQL Workbench antes de iniciar la API. Una instalación nueva debe usar el esquema actualizado de `sql/bikestore.sql`.
 
 Desde PowerShell, inicia el backend:
 
@@ -13,31 +48,28 @@ cd backend
 npm run dev
 ```
 
-La URL base local es `http://localhost:3000`. Crea un entorno en Postman o RapidAPI Client con estas variables:
+Usa las URLs completas de la tabla anterior. En Postman o RapidAPI Client solo necesitas estas variables:
 
 | Variable | Valor inicial |
 |---|---|
-| `baseUrl` | `http://localhost:3000/api` |
-| `adminToken` | (vacío; se guarda al iniciar sesión como administrador) |
-| `clientToken` | (vacío; se guarda al iniciar sesión como cliente) |
+| `token` | (vacío; pega el JWT del rol que probarás) |
 | `productId` | (ID de un producto de prueba) |
-| `cartItemId` | (ID devuelto al agregar un producto al carrito) |
 | `userId` | (ID de un usuario de prueba) |
 
 Para rutas protegidas, agrega el encabezado:
 
 ```http
-Authorization: Bearer {{clientToken}}
+Authorization: Bearer {{token}}
 ```
 
-Usa `{{adminToken}}` en rutas administrativas. Para enviar JSON configura `Content-Type: application/json`. En solicitudes multipart, el cliente debe generar automáticamente el `Content-Type` con su boundary.
+Usa `{{token}}` en rutas administrativas. Para enviar JSON configura `Content-Type: application/json`. En solicitudes multipart, el cliente debe generar automáticamente el `Content-Type` con su boundary.
 
 ## 2. Estado y catálogo público
 
 ### Comprobar que la API responde
 
 ```http
-GET {{baseUrl}}/health
+GET http://localhost:3000/api/health
 ```
 
 No requiere autenticación. Respuesta esperada: `200`.
@@ -45,7 +77,7 @@ No requiere autenticación. Respuesta esperada: `200`.
 ### Listar productos activos
 
 ```http
-GET {{baseUrl}}/products
+GET http://localhost:3000/api/products
 ```
 
 Parámetros de consulta opcionales:
@@ -61,19 +93,19 @@ Parámetros de consulta opcionales:
 Ejemplo:
 
 ```http
-GET {{baseUrl}}/products?section=Bicicletas&sort=asc
+GET http://localhost:3000/api/products?section=Bicicletas&sort=asc
 ```
 
 ### Consultar categorías
 
 ```http
-GET {{baseUrl}}/products/categories
+GET http://localhost:3000/api/products/categories
 ```
 
 ### Consultar un producto
 
 ```http
-GET {{baseUrl}}/products/{{productId}}
+GET http://localhost:3000/api/products/{{productId}}
 ```
 
 Las rutas públicas solo devuelven productos activos. Si el ID no existe o está inactivo, la API responde `404`.
@@ -83,7 +115,7 @@ Las rutas públicas solo devuelven productos activos. Si el ID no existe o está
 ### Registrar un cliente
 
 ```http
-POST {{baseUrl}}/auth/register
+POST http://localhost:3000/api/auth/register
 Content-Type: application/json
 ```
 
@@ -102,7 +134,7 @@ Content-Type: application/json
 ### Iniciar sesión
 
 ```http
-POST {{baseUrl}}/auth/login
+POST http://localhost:3000/api/auth/login
 Content-Type: application/json
 ```
 
@@ -113,20 +145,20 @@ Content-Type: application/json
 }
 ```
 
-La respuesta contiene `user` y `token`. Guarda el token en la variable `clientToken`. Para iniciar sesión como administrador local, usa las credenciales definidas por `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD` en `backend/.env` (en la configuración de ejemplo son `admin@bikestore.local` y `BikeStoreAdmin2026!`); guarda ese token en `adminToken`.
+La respuesta contiene `user` y `token`. Guarda el token en la variable `token`. Para iniciar sesión como administrador local, usa las credenciales definidas por `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD` en `backend/.env` (en la configuración de ejemplo son `admin@bikestore.local` y `BikeStoreAdmin2026!`); guarda ese token en `token`.
 
 Errores de autenticación esperados: credenciales incorrectas `401`; cuenta inactiva `403`.
 
 ### Consultar y actualizar el perfil propio
 
 ```http
-GET {{baseUrl}}/auth/me
-Authorization: Bearer {{clientToken}}
+GET http://localhost:3000/api/auth/me
+Authorization: Bearer {{token}}
 ```
 
 ```http
-PATCH {{baseUrl}}/auth/me
-Authorization: Bearer {{clientToken}}
+PATCH http://localhost:3000/api/auth/me
+Authorization: Bearer {{token}}
 Content-Type: application/json
 ```
 
@@ -149,7 +181,7 @@ El envío requiere que SMTP/Gmail esté configurado en `backend/.env`.
 1. Solicitar código:
 
    ```http
-   POST {{baseUrl}}/auth/password/forgot
+   POST http://localhost:3000/api/auth/password/forgot
    Content-Type: application/json
    ```
 
@@ -160,7 +192,7 @@ El envío requiere que SMTP/Gmail esté configurado en `backend/.env`.
 2. Verificar el código de seis dígitos recibido por correo:
 
    ```http
-   POST {{baseUrl}}/auth/password/verify
+   POST http://localhost:3000/api/auth/password/verify
    Content-Type: application/json
    ```
 
@@ -173,7 +205,7 @@ El envío requiere que SMTP/Gmail esté configurado en `backend/.env`.
 3. Cambiar la contraseña:
 
    ```http
-   POST {{baseUrl}}/auth/password/reset
+   POST http://localhost:3000/api/auth/password/reset
    Content-Type: application/json
    ```
 
@@ -185,13 +217,13 @@ El código vence a los 15 minutos, permite hasta cinco intentos y el token de ca
 
 ## 5. Productos: lectura y CRUD administrativo
 
-Estas operaciones requieren `adminToken`. No existe una ruta `DELETE` física de productos: el producto se conserva y se inactiva mediante `PATCH`.
+Estas operaciones requieren `token`. No existe una ruta `DELETE` física de productos: el producto se conserva y se inactiva mediante `PATCH`.
 
 ### Listar productos de administración
 
 ```http
-GET {{baseUrl}}/products/manage?search=bici&section=Bicicletas&status=Activo
-Authorization: Bearer {{adminToken}}
+GET http://localhost:3000/api/products/manage?search=bici&section=Bicicletas&status=Activo
+Authorization: Bearer {{token}}
 ```
 
 Los filtros `search`, `section` y `status` son opcionales. `status` puede ser `Activo`/`Inactivo` o `active`/`inactive`.
@@ -201,8 +233,8 @@ Los filtros `search`, `section` y `status` son opcionales. `status` puede ser `A
 Para crear un producto sin subir archivo, envía JSON y una imagen existente (por ejemplo, `/assets/products/img-005.jpg`):
 
 ```http
-POST {{baseUrl}}/products
-Authorization: Bearer {{adminToken}}
+POST http://localhost:3000/api/products
+Authorization: Bearer {{token}}
 Content-Type: application/json
 ```
 
@@ -216,7 +248,7 @@ Content-Type: application/json
   "price": 1250000,
   "stock": 8,
   "image": "/assets/products/img-005.jpg",
-  "badge": "Prueba",
+  "etiqueta": "Prueba",
   "sizes": ["S", "M", "L"]
 }
 ```
@@ -236,13 +268,15 @@ Para probar carga de imagen, usa `Body > form-data` en Postman (o la opción equ
 | `sizes` | Text | `["S","M","L"]` |
 | `images` | File | Repite la clave para cargar hasta 10 imágenes JPG, PNG o WEBP (máximo 20 MB cada una) |
 
-El campo de archivo debe llamarse exactamente `images`; `image` es la URL de la imagen principal y `gallery` es un arreglo JSON serializado de URLs ya guardadas. Consulta `GET /products/images` con `adminToken` para obtener las rutas reutilizables de `public/assets/products` y `uploads`.
+El campo de archivo debe llamarse exactamente `images`; `image` es la URL de la imagen principal y `gallery` es un arreglo JSON serializado de URLs ya guardadas. Consulta `GET http://localhost:3000/api/products/images` con `token` para obtener las rutas reutilizables de `public/assets/products` y `uploads`.
+
+Los archivos nuevos se escriben en `backend/uploads`. La URL de la imagen principal queda en `producto.imagen_producto`; las URLs adicionales se guardan en la tabla `imagen`. Las imágenes que ya están en `frontend/public/assets/products` se reutilizan por su ruta y no se copian a `uploads`.
 
 ### Actualizar producto
 
 ```http
-PUT {{baseUrl}}/products/{{productId}}
-Authorization: Bearer {{adminToken}}
+PUT http://localhost:3000/api/products/{{productId}}
+Authorization: Bearer {{token}}
 Content-Type: application/json
 ```
 
@@ -256,7 +290,7 @@ Content-Type: application/json
   "price": 1300000,
   "stock": 6,
   "image": "/assets/products/img-005.jpg",
-  "badge": "Actualizado",
+  "etiqueta": "Actualizado",
   "sizes": ["M", "L", "XL"]
 }
 ```
@@ -266,8 +300,8 @@ El backend conserva los valores existentes cuando no se envían, pero se recomie
 ### Inactivar producto (baja lógica)
 
 ```http
-PATCH {{baseUrl}}/products/{{productId}}/deactivate
-Authorization: Bearer {{adminToken}}
+PATCH http://localhost:3000/api/products/{{productId}}/deactivate
+Authorization: Bearer {{token}}
 Content-Type: application/json
 ```
 
@@ -280,23 +314,23 @@ No se borra físicamente. Después de inactivarlo, comprueba que ya no aparece e
 Para reactivarlo:
 
 ```http
-PATCH {{baseUrl}}/products/{{productId}}/reactivate
-Authorization: Bearer {{adminToken}}
+PATCH http://localhost:3000/api/products/{{productId}}/reactivate
+Authorization: Bearer {{token}}
 ```
 
 ## 6. Carrito
 
-El carrito se guarda en `localStorage` del frontend y no tiene endpoints ni tablas en MySQL. Para probar el checkout directamente con la API, envía los IDs, cantidades y tallas en `items`; el servidor valida disponibilidad y precios desde la base de datos, sin confiar en valores del cliente.
+El carrito se guarda en `localStorage` del frontend y no tiene endpoints ni tablas en MySQL. Para probar el checkout directamente con la API, inicia sesión como cliente y envía los IDs, cantidades y tallas en `items`; no necesitas agregar nada al carrito del navegador. El servidor valida disponibilidad y precios desde la base de datos, sin confiar en valores del cliente.
 
 ## 7. Pedidos y pago simulado
 
 ### Crear pedido y descontar stock
 
-Primero inicia sesión como cliente y agrega uno o más productos al carrito. Luego envía:
+Inicia sesión como cliente. Para esta prueba directa no necesitas usar el carrito de la tienda; envía uno o más productos dentro de `items`:
 
 ```http
-POST {{baseUrl}}/orders
-Authorization: Bearer {{clientToken}}
+POST http://localhost:3000/api/orders
+Authorization: Bearer {{token}}
 Content-Type: application/json
 ```
 
@@ -340,13 +374,13 @@ Alternativa PSE:
 }
 ```
 
-El pago es simulado. No se guardan el número de tarjeta, vencimiento ni CVV. La tarjeta debe pasar Luhn, el vencimiento debe estar vigente en formato `MM/AA` y el CVV debe tener exactamente tres dígitos. En un checkout correcto la respuesta es `201`, el stock baja dentro de la transacción y el carrito se vacía. Guarda `data.orderNumber` para identificar el pedido.
+El pago es simulado. No se guardan el número de tarjeta, vencimiento ni CVV. La tarjeta debe pasar Luhn, el vencimiento debe estar vigente en formato `MM/AA` y el CVV debe tener exactamente tres dígitos. En un checkout correcto la respuesta es `201` y el stock baja dentro de la transacción. Guarda `data.orderNumber` para identificar el pedido. El carrito del navegador solo se vacía cuando la compra se confirma desde la interfaz de la tienda.
 
 ### Consultar historial de pedidos
 
 ```http
-GET {{baseUrl}}/orders/mine
-Authorization: Bearer {{clientToken}}
+GET http://localhost:3000/api/orders/mine
+Authorization: Bearer {{token}}
 ```
 
 Un administrador también puede consultar su propio historial con su token; la ruta no lista pedidos de todos los usuarios.
@@ -356,8 +390,8 @@ Un administrador también puede consultar su propio historial con su token; la r
 ### Listar usuarios
 
 ```http
-GET {{baseUrl}}/admin/users?search=cliente&status=Activo
-Authorization: Bearer {{adminToken}}
+GET http://localhost:3000/api/admin/users?search=cliente&status=Activo
+Authorization: Bearer {{token}}
 ```
 
 Ambos parámetros son opcionales. `status` admite `Activo`/`Inactivo` o `active`/`inactive`.
@@ -365,8 +399,8 @@ Ambos parámetros son opcionales. `status` admite `Activo`/`Inactivo` o `active`
 ### Crear usuario (administración)
 
 ```http
-POST {{baseUrl}}/admin/users
-Authorization: Bearer {{adminToken}}
+POST http://localhost:3000/api/admin/users
+Authorization: Bearer {{token}}
 Content-Type: application/json
 ```
 
@@ -384,8 +418,8 @@ Content-Type: application/json
 ### Actualizar usuario
 
 ```http
-PUT {{baseUrl}}/admin/users/{{userId}}
-Authorization: Bearer {{adminToken}}
+PUT http://localhost:3000/api/admin/users/{{userId}}
+Authorization: Bearer {{token}}
 Content-Type: application/json
 ```
 
@@ -402,8 +436,8 @@ La API exige los tres campos. No se cambia la contraseña mediante esta ruta.
 ### Inactivar usuario (baja lógica)
 
 ```http
-PATCH {{baseUrl}}/admin/users/{{userId}}/deactivate
-Authorization: Bearer {{adminToken}}
+PATCH http://localhost:3000/api/admin/users/{{userId}}/deactivate
+Authorization: Bearer {{token}}
 ```
 
 No hay borrado físico de usuarios. El sistema impide inactivar o degradar al último administrador activo.
@@ -411,17 +445,17 @@ No hay borrado físico de usuarios. El sistema impide inactivar o degradar al ú
 Reactivar una cuenta inactiva:
 
 ```http
-PATCH {{baseUrl}}/admin/users/{{userId}}/reactivate
-Authorization: Bearer {{adminToken}}
+PATCH http://localhost:3000/api/admin/users/{{userId}}/reactivate
+Authorization: Bearer {{token}}
 ```
 
 ## 9. Dashboard administrativo
 
-Requiere `adminToken`.
+Requiere `token`.
 
 ```http
-GET {{baseUrl}}/admin/dashboard?year=2026&month=11&view=days&section=Bicicletas
-Authorization: Bearer {{adminToken}}
+GET http://localhost:3000/api/admin/dashboard?year=2026&month=11&view=days&section=Bicicletas
+Authorization: Bearer {{token}}
 ```
 
 Parámetros opcionales: `year` (2000–2100), `month` (1–12), `view` (`days` o `months`) y `section` (por ejemplo, `Bicicletas`, `Componentes`, `Accesorios` o `Todas`). La vista mensual resume el año; la diaria puede filtrar un mes.
@@ -429,8 +463,8 @@ Parámetros opcionales: `year` (2000–2100), `month` (1–12), `view` (`days` o
 Para obtener las filas del informe:
 
 ```http
-GET {{baseUrl}}/admin/dashboard/export?year=2026&month=11&view=days
-Authorization: Bearer {{adminToken}}
+GET http://localhost:3000/api/admin/dashboard/export?year=2026&month=11&view=days
+Authorization: Bearer {{token}}
 ```
 
 ## 10. Casos negativos y controles de acceso
@@ -451,17 +485,15 @@ Prueba también estas respuestas esperadas para verificar validaciones y permiso
 | Enviar tarjeta que no pasa Luhn, vencida o CVV que no tenga 3 dígitos | `400` |
 | Enviar motivo vacío al inactivar un producto | `400` |
 
-Las respuestas de error usan el formato `{ "ok": false, "message": "..." }`. Un verbo `DELETE` está disponible para quitar un ítem del carrito; para productos y usuarios la API utiliza baja lógica por `PATCH`, no borrado físico. Las rutas implementadas se definen en `backend/src/routes`.
+Las respuestas de error usan el formato `{ "ok": false, "message": "..." }`. El carrito solo existe en el navegador; no hay rutas API para consultarlo, modificarlo o borrarlo. Para productos y usuarios la API utiliza baja lógica por `PATCH`, no borrado físico. Las rutas implementadas se definen en `backend/src/routes`.
 
 ## 11. Secuencia recomendada de prueba integral
 
-1. `GET /health` y confirma `200`.
-2. Inicia sesión como administrador y guarda `adminToken`.
-3. Consulta `GET /products/categories`; crea un producto con nombre único y guarda `productId`.
-4. Registra o inicia sesión como cliente y guarda `clientToken`.
-5. Agrega el producto al carrito; guarda `cartItemId`.
-6. Cambia la cantidad con `PATCH`, vuelve a consultar el carrito y comprueba el stock máximo.
-7. Completa un pedido con datos simulados y comprueba `GET /orders/mine`.
-8. Consulta el producto con el token de administrador para verificar que el stock disminuyó y que el carrito quedó vacío.
-9. Inactiva el producto con motivo y comprueba su ausencia del catálogo público.
-
+1. Ejecuta `GET http://localhost:3000/api/health` y confirma `200`.
+2. Ejecuta `POST http://localhost:3000/api/auth/login` con credenciales de administrador y guarda su JWT en `token`.
+3. Consulta `GET http://localhost:3000/api/products/categories`; crea un producto con nombre único y guarda `data.id` como `productId`.
+4. Inicia sesión como cliente con `POST http://localhost:3000/api/auth/login` y reemplaza `token` por el JWT del cliente.
+5. Ejecuta `POST http://localhost:3000/api/orders` con los datos de envío y `items` del ejemplo; la API valida stock y precio.
+6. Consulta `GET http://localhost:3000/api/orders/mine` para verificar el pedido.
+7. Vuelve a iniciar sesión como admin, reemplaza `token` y consulta `GET http://localhost:3000/api/products/{{productId}}` para revisar el stock.
+8. Inactiva el producto con `PATCH http://localhost:3000/api/products/{{productId}}/deactivate` y comprueba que ya no aparece en el catálogo público.

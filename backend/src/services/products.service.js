@@ -20,7 +20,7 @@ function mapProduct(row) {
         image: row.image_url,
         gallery: row.gallery || [],
         sizes: row.sizes || [],
-        badge: row.badge,
+        etiqueta: row.etiqueta,
         status: row.status === 'active' ? 'Activo' : 'Inactivo',
         inactivationReason: row.inactivation_reason
     };
@@ -158,7 +158,7 @@ async function listProducts({ search = '', section = '', category = '', category
     const [rows] = await pool.execute(
         `SELECT p.id_producto AS id, p.nombre_producto AS name, p.descripcion_general AS description,
                 p.especificaciones_tecnicas AS technical_specs, p.precio_producto AS price, p.stock,
-                p.imagen_producto AS image_url, p.badge, p.estado_producto AS status,
+                p.imagen_producto AS image_url, p.etiqueta, p.estado_producto AS status,
                 p.motivo_inactivacion AS inactivation_reason,
                 c.id_categoria AS category_id, c.nombre_categoria AS category, s.nombre_seccion AS section
          FROM producto p
@@ -176,7 +176,7 @@ async function getProduct(id, admin = false) {
     const [rows] = await pool.execute(
         `SELECT p.id_producto AS id, p.nombre_producto AS name, p.descripcion_general AS description,
             p.especificaciones_tecnicas AS technical_specs, p.precio_producto AS price, p.stock,
-            p.imagen_producto AS image_url, p.badge, p.estado_producto AS status,
+            p.imagen_producto AS image_url, p.etiqueta, p.estado_producto AS status,
             p.motivo_inactivacion AS inactivation_reason,
             c.id_categoria AS category_id, c.nombre_categoria AS category, s.nombre_seccion AS section
          FROM producto p JOIN categoria c ON c.id_categoria = p.id_categoria
@@ -213,7 +213,7 @@ async function createProduct(data, fileNames = []) {
         const [result] = await connection.execute(
                         `INSERT INTO producto
                          (id_seccion, id_categoria, nombre_producto, descripcion_general, especificaciones_tecnicas,
-                            precio_producto, stock, imagen_producto, badge)
+                            precio_producto, stock, imagen_producto, etiqueta)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 sectionId,
@@ -224,7 +224,7 @@ async function createProduct(data, fileNames = []) {
                 validated.price,
                 validated.stock,
                 image,
-                data.badge?.trim() || null
+                data.etiqueta?.trim() || null
             ]
         );
         productId = result.insertId;
@@ -271,7 +271,7 @@ async function updateProduct(id, data, fileNames = []) {
         await connection.beginTransaction();
         await connection.execute(
             `UPDATE producto SET id_seccion = ?, id_categoria = ?, nombre_producto = ?, descripcion_general = ?,
-             especificaciones_tecnicas = ?, precio_producto = ?, stock = ?, imagen_producto = ?, badge = ?
+             especificaciones_tecnicas = ?, precio_producto = ?, stock = ?, imagen_producto = ?, etiqueta = ?
              WHERE id_producto = ?`,
             [
                 sectionId,
@@ -282,7 +282,7 @@ async function updateProduct(id, data, fileNames = []) {
                 validated.price,
                 validated.stock,
                 image || null,
-                merged.badge?.trim() || null,
+                merged.etiqueta?.trim() || null,
                 id
             ]
         );

@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS producto (
   precio_producto DECIMAL(12, 2) NOT NULL,
   stock INT UNSIGNED NOT NULL DEFAULT 0,
   imagen_producto VARCHAR(500) NULL,
-  badge VARCHAR(40) NULL,
+  etiqueta VARCHAR(40) NULL,
   estado_producto ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
   motivo_inactivacion VARCHAR(500) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -174,14 +174,14 @@ CREATE TABLE IF NOT EXISTS pago (
   CONSTRAINT fk_payments_order FOREIGN KEY (id_pedido) REFERENCES pedido(id_pedido)
 );
 
-INSERT INTO producto (id_seccion, id_categoria, nombre_producto, descripcion_general, especificaciones_tecnicas, precio_producto, stock, imagen_producto, badge)
-SELECT s.id_seccion, c.id_categoria, seed.name, seed.description, seed.specs, seed.price, seed.stock, seed.image, seed.badge
+INSERT INTO producto (id_seccion, id_categoria, nombre_producto, descripcion_general, especificaciones_tecnicas, precio_producto, stock, imagen_producto, etiqueta)
+SELECT s.id_seccion, c.id_categoria, seed.name, seed.description, seed.specs, seed.price, seed.stock, seed.image, seed.etiqueta
 FROM (
   SELECT 'Bicicletas' AS section_name, 'Montaña' AS category_name,
     'Bicicleta de montaña con cuadro de carbono y suspensión para rutas exigentes.' AS name,
     'Bicicleta de montaña con cuadro de carbono y suspensión para rutas exigentes.' AS description,
     JSON_OBJECT('cuadro', 'Carbono', 'suspension', 'Delantera') AS specs,
-    4599000 AS price, 5 AS stock, '/assets/products/img-030.jpg' AS image, 'Nuevo' AS badge
+    4599000 AS price, 5 AS stock, '/assets/products/img-030.jpg' AS image, 'Nuevo' AS etiqueta
   UNION ALL
   SELECT 'Bicicletas', 'Carretera / Ruta', 'Bicicleta de ruta de alto rendimiento',
     'Bicicleta de ruta ligera para entrenamiento y competencia.',

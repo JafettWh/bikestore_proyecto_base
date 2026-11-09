@@ -46,11 +46,13 @@ Son solo para desarrollo local. Cámbialas antes de compartir el entorno. El see
 
 La API envía códigos de 6 dígitos por SMTP de Gmail; guarda como máximo un hash vigente en la fila del usuario y vence en 15 minutos. Un nuevo código reemplaza al anterior; hay límite de intentos, el código se valida una sola vez y los campos temporales se limpian al restablecer la contraseña. No se conserva un historial de códigos. El token temporal de restablecimiento también vence. Configuración:
 
-1. Activa la verificación en dos pasos de la cuenta remitente de Google.
-2. En la configuración de seguridad de Google crea una **Contraseña de aplicación** para BikeStore. No uses la contraseña normal de Gmail.
-3. En `backend/.env`, configura `GMAIL_USER` con esa cuenta y `GMAIL_APP_PASSWORD` con la contraseña de aplicación (sin espacios). Opcionalmente configura `MAIL_FROM`; por defecto se usa `GMAIL_USER`.
-4. Conserva `SMTP_HOST=smtp.gmail.com` y `SMTP_PORT=465` (TLS). Si Google Workspace bloquea SMTP, el administrador del dominio debe habilitarlo.
-5. Reinicia `npm run dev` y prueba el recorrido **Olvidé mi contraseña**. El backend reporta explícitamente cuando falta configuración o Gmail rechaza el envío.
+1. Inicia sesión en la cuenta Gmail que enviará los códigos y activa la verificación en dos pasos.
+2. En la seguridad de esa cuenta, genera una **Contraseña de aplicación** para BikeStore. Google solo muestra esa clave al crearla; no uses la contraseña normal de Gmail.
+3. En `backend/.env` (no en el frontend), completa `GMAIL_USER` con la dirección remitente y `GMAIL_APP_PASSWORD` con la contraseña de aplicación. Escríbela sin espacios. Opcionalmente, `MAIL_FROM` define el remitente visible; si se deja vacío, usa `GMAIL_USER`.
+4. Deja `SMTP_HOST=smtp.gmail.com` y `SMTP_PORT=465`. El puerto 465 usa TLS. Si usas Google Workspace y el envío está bloqueado, pide al administrador del dominio que habilite SMTP.
+5. Guarda el archivo y reinicia el backend (`cd backend; npm run dev`). Prueba desde el frontend: **Iniciar sesión → ¿Olvidaste tu contraseña?**. Ingresa el correo de una cuenta activa, revisa la bandeja de entrada y spam, confirma el código de 6 dígitos y define la nueva contraseña.
+
+No compartas ni subas `GMAIL_APP_PASSWORD`: `backend/.env` es local e ignorado por Git. Sin esas variables el resto de la API funciona, pero la recuperación por correo responde que falta configurar el envío. Si Gmail rechaza el acceso, confirma que copiaste la contraseña de aplicación correcta, que el usuario corresponde a la misma cuenta y que reiniciaste el backend. Cada código vence en 15 minutos; al reenviar, el anterior deja de ser válido.
 
 Endpoints del flujo: `POST /api/auth/password/forgot`, `POST /api/auth/password/verify` y `POST /api/auth/password/reset`.
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useCart } from "../hooks/useCart";
 import { useAuth } from "../hooks/useAuth";
 import { formatCOP } from "../utils/formatters";
@@ -7,30 +7,8 @@ import Button from "../components/Button";
 import Input from "../components/Input";
 import { asset } from "../config/env";
 import { apiRequest } from "../utils/api";
+import { colombiaLocations } from "../utils/colombiaLocations";
 import "../assets/styles.css";
-// Departamentos de Colombia con ciudades y municipios principales
-const departamentosColombia = {
-    "Valle del Cauca": ["Palmira", "Cali", "Buga", "Tuluá", "Yumbo", "Jamundí", "Cartago", "Buenaventura", "Candelaria", "Pradera"],
-    "Antioquia": ["Medellín", "Envigado", "Rionegro", "Itagüí", "Bello", "Sabaneta", "La Ceja", "Apartadó"],
-    "Bogotá D.C.": ["Bogotá D.C. (Usaquén)", "Bogotá D.C. (Chapinero)", "Bogotá D.C. (Suba)", "Bogotá D.C. (Teusaquillo)", "Bogotá D.C. (Fontibón)"],
-    "Cundinamarca": ["Chía", "Cota", "Soacha", "Facatativá", "Zipaquirá", "Fusagasugá", "Mosquera", "Madrid", "Funza"],
-    "Santander": ["Bucaramanga", "Floridablanca", "Girón", "Piedecuesta", "Barrancabermeja", "San Gil"],
-    "Atlántico": ["Barranquilla", "Soledad", "Malambo", "Puerto Colombia"],
-    "Risaralda": ["Pereira", "Dosquebradas", "Santa Rosa de Cabal"],
-    "Caldas": ["Manizales", "Villamaría", "Chinchiná"],
-    "Quindío": ["Armenia", "Calarcá", "Circasia", "Montenegro"],
-    "Tolima": ["Ibagué", "Espinal", "Melgar"],
-    "Huila": ["Neiva", "Pitalito", "Garzón"],
-    "Bolívar": ["Cartagena", "Turbaco", "Magangué"],
-    "Boyacá": ["Tunja", "Duitama", "Sogamoso", "Villa de Leyva"],
-    "Cauca": ["Popayán", "Santander de Quilichao"],
-    "Nariño": ["Pasto", "Ipiales", "Tumaco"],
-    "Meta": ["Villavicencio", "Acacías", "Granada"],
-    "Norte de Santander": ["Cúcuta", "Los Patios", "Villa del Rosario", "Ocaña"],
-    "Magdalena": ["Santa Marta", "Ciénaga"],
-    "Córdoba": ["Montería", "Cereté", "Lorica"],
-    "Cesar": ["Valledupar", "Aguachica"],
-};
 
 function isValidCardNumber(value) {
     if (!/^\d{13,19}$/.test(value) || /^(\d)\1+$/.test(value)) return false;
@@ -59,7 +37,7 @@ function isValidExpiry(value) {
 
 export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
     const { items, subtotal, tax, shipping, total, clearCart } = useCart();
-    const { token } = useAuth();
+    const { token, currentUser } = useAuth();
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [address, setAddress] = useState("");
@@ -76,7 +54,19 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
     const [cvv, setCvv] = useState("");
     const [bankName, setBankName] = useState("");
     // Lista de ciudades dinámicas según departamento
-    const availableCities = departamentosColombia[department] || [];
+    const availableCities = colombiaLocations[department] || [];
+
+    useEffect(() => {
+        if (!currentUser) return;
+        setName(currentUser.name || "");
+        setEmail(currentUser.email || "");
+        setPhone((currentUser.phone || "").replace(/\D/g, "").slice(0, 10));
+        setDepartment(currentUser.department || "");
+        setCity(currentUser.city || "");
+        setAddress(currentUser.address || "");
+        setNeighborhood(currentUser.neighborhood || "");
+    }, [currentUser]);
+
     const handleDepartmentChange = (newDept) => {
         setDepartment(newDept);
         setCity("");
@@ -99,6 +89,30 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
     const handleCheckout = async (e) => {
         e.preventDefault();
         setCheckoutError("");
+        if (!/^[\p{L}\p{M}][\p{L}\p{M} .'-]{2,119}$/u.test(name.trim())) {
+            setCheckoutError("Ingresa un nombre de 3 a 120 caracteres, usando letras y espacios.");
+            return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.length > 254) {
+            setCheckoutError("Ingresa un correo electrónico válido de máximo 254 caracteres.");
+            return;
+        }
+        if (!/^3\d{9}$/.test(phone)) {
+            setCheckoutError("El teléfono móvil debe comenzar por 3 y tener 10 dígitos.");
+            return;
+        }
+        if (!department || !availableCities.includes(city)) {
+            setCheckoutError("Selecciona un departamento y una ciudad o municipio de la lista.");
+            return;
+        }
+        if (address.trim().length < 5 || address.trim().length > 255) {
+            setCheckoutError("La dirección debe tener entre 5 y 255 caracteres.");
+            return;
+        }
+        if (neighborhood.trim().length > 120) {
+            setCheckoutError("El barrio o las indicaciones no pueden superar 120 caracteres.");
+            return;
+        }
         if (paymentMethod === "card") {
             if (!isValidCardNumber(cardNumber)) {
                 setCheckoutError("Ingresa un número de tarjeta válido de 13 a 19 dígitos.");
@@ -174,46 +188,46 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
             </h2>
 
             <div className="checkout-div-3">
-              <Input label="Nombre Completo" required value={name} onChange={(e) => setName(e.target.value)}/>
-              <Input label="Correo Electrónico" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}/>
+              <Input label="Nombre Completo" required minLength={3} maxLength={120} pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ .'-]{3,120}" title="Usa letras, espacios, apóstrofes, puntos o guiones (3 a 120 caracteres)." value={name} onChange={(e) => setName(e.target.value)}/>
+              <Input label="Correo Electrónico" type="email" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)}/>
 
               {/* Selector de Departamento */}
               <div className="checkout-div-4">
-                <label className="checkout-label-1">
+                <label className="checkout-label-1" htmlFor="checkout-department">
                   Departamento *
                 </label>
-                <select value={department} onChange={(e) => handleDepartmentChange(e.target.value)} className="checkout-select-1">
+                <select id="checkout-department" required value={department} onChange={(e) => handleDepartmentChange(e.target.value)} className="checkout-select-1">
                   <option value="">Selecciona un departamento</option>
-                  {Object.keys(departamentosColombia).map((dept) => (<option key={dept} value={dept}>
+                  {Object.keys(colombiaLocations).map((dept) => (<option key={dept} value={dept}>
                       {dept}
                     </option>))}
                 </select>
               </div>
 
-              {/* Selector / Input de Ciudad con sugerencias */}
+              {/* Selector de ciudad para restringir el despacho a una opción válida */}
               <div className="checkout-div-4">
-                <label className="checkout-label-1">
+                <label className="checkout-label-1" htmlFor="checkout-city">
                   Ciudad o Municipio *
                 </label>
-                <input type="text" required list="ciudades-list" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ciudad o municipio" className="checkout-input-1"/>
-                <datalist id="ciudades-list">
-                  {availableCities.map((c) => (<option key={c} value={c}/>))}
-                </datalist>
+                <select id="checkout-city" required value={city} onChange={(e) => setCity(e.target.value)} className="checkout-select-1">
+                  <option value="">Selecciona una ciudad</option>
+                  {availableCities.map((c) => (<option key={c} value={c}>{c}</option>))}
+                </select>
                 <span className="checkout-span-3">
                   {availableCities.length ? `Opciones: ${availableCities.slice(0, 4).join(", ")}` : "Selecciona primero un departamento."}
                 </span>
               </div>
 
               <div className="checkout-div-5">
-                <Input label="Dirección de Entrega Detallada" required placeholder="Calle, Carrera, Número, Conjunto o Apartamento" value={address} onChange={(e) => setAddress(e.target.value)}/>
+              <Input label="Dirección de Entrega Detallada" required minLength={5} maxLength={255} pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 #.,/º°'-]{5,255}" title="Usa de 5 a 255 caracteres con letras, números y separadores comunes." placeholder="Calle, Carrera, Número, Conjunto o Apartamento" value={address} onChange={(e) => setAddress(e.target.value)}/>
               </div>
 
               <div className="checkout-div-5">
-                <Input label="Barrio / Apartamento / Indicaciones de entrega" placeholder="Opcional" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)}/>
+              <Input label="Barrio / Apartamento / Indicaciones de entrega" placeholder="Opcional" maxLength={120} pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 #.,/º°'-]{0,120}" title="Usa hasta 120 caracteres con letras, números y separadores comunes." value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)}/>
               </div>
 
               <div className="checkout-div-5">
-                <Input label="Teléfono Móvil de Contacto" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="300 000 0000"/>
+              <Input label="Teléfono Móvil de Contacto" required inputMode="numeric" maxLength={10} pattern="3[0-9]{9}" title="Ingresa un número colombiano de 10 dígitos que comience por 3." value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="3001234567"/>
               </div>
             </div>
           </section>
@@ -244,7 +258,7 @@ export const CheckoutPage = ({ onNavigate, onOrderCompleted, }) => {
 
             {paymentMethod === "card" ? (<div className="checkout-div-7">
                 <div className="checkout-div-8">
-                  <Input id="card-number" label="Número de Tarjeta (simulado)" required inputMode="numeric" autoComplete="off" maxLength={19} pattern="[0-9]{13,19}" placeholder="Ingresa datos de prueba; no uses una tarjeta real" value={cardNumber} onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, "").slice(0, 19))}/>
+                  <Input id="card-number" label="Número de Tarjeta (simulado)" required inputMode="numeric" autoComplete="off" maxLength={23} pattern="[0-9 ]{16,23}" placeholder="0000 0000 0000 0000" helper="Solo se admiten números de prueba; no uses una tarjeta real." value={cardNumber.replace(/(\d{4})(?=\d)/g, "$1 ")} onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, "").slice(0, 19))}/>
                 </div>
                 <Input id="card-expiry" label="Vencimiento" required inputMode="numeric" autoComplete="off" maxLength={5} pattern="(0[1-9]|1[0-2])/[0-9]{2}" placeholder="MM/AA" value={expiry} onChange={(e) => {
                     const digits = e.target.value.replace(/\D/g, "").slice(0, 4);

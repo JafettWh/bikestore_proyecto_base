@@ -10,9 +10,9 @@ export const ProductCard = ({ product, onAddToCart, onViewDetail, }) => {
     return (<article className="product-card-article-1 group">
       {/* Contenedor de Imagen */}
       <button type="button" onClick={() => onViewDetail(product)} aria-label={`Ver detalles de ${product.name}`} className="product-card-button-1">
-        {product.badge && (<div className="product-card-div-1">
-            <Badge variant={isOutOfStock ? "red" : product.badge === "Oferta" ? "yellow" : "dark"}>
-              {isOutOfStock ? "Sin Stock" : product.badge}
+        {product.etiqueta && (<div className="product-card-div-1">
+            <Badge variant={isOutOfStock ? "red" : product.etiqueta === "Oferta" ? "yellow" : "dark"}>
+              {isOutOfStock ? "Sin Stock" : product.etiqueta}
             </Badge>
           </div>)}
 

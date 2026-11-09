@@ -8,6 +8,8 @@ import TermsModal from "../components/TermsModal";
 import { apiRequest } from "../utils/api";
 import "../assets/styles.css";
 
+const registrationNamePattern = /^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u;
+
 export const AuthPage = ({ mode, onNavigate, returnAfterAuth }) => {
   const { login, register } = useAuth();
   const { refreshCart } = useCart();
@@ -59,6 +61,18 @@ export const AuthPage = ({ mode, onNavigate, returnAfterAuth }) => {
     setSuccessMsg("");
     if (!name.trim() || !email.trim() || !phone.trim() || !password || !confirmPassword) {
       setError("Completa todos los campos obligatorios.");
+      return;
+    }
+    if (name.trim().length < 3 || name.trim().length > 120 || !registrationNamePattern.test(name.trim())) {
+      setError("El nombre debe tener entre 3 y 120 caracteres y solo incluir letras, espacios, apóstrofes, puntos o guiones.");
+      return;
+    }
+    if (!/^3\d{9}$/.test(phone)) {
+      setError("Ingresa un teléfono móvil colombiano de 10 dígitos que comience por 3.");
+      return;
+    }
+    if (email.trim().length > 254) {
+      setError("El correo no puede superar 254 caracteres.");
       return;
     }
     if (password.length < 8) {
@@ -247,12 +261,12 @@ export const AuthPage = ({ mode, onNavigate, returnAfterAuth }) => {
         <form onSubmit={isRegister ? handleRegister : handleLogin} className="auth-form-1">
           {isRegister && (
             <>
-              <Input label="Nombre Completo" required autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} />
-              <Input label="Teléfono Móvil / WhatsApp" type="tel" required autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} />
+              <Input label="Nombre Completo" required autoComplete="name" minLength={3} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} error={name.length > 0 && (name.trim().length < 3 || name.trim().length > 120 || !registrationNamePattern.test(name.trim())) ? "Usa de 3 a 120 caracteres: letras, espacios, apóstrofes, puntos o guiones." : undefined} />
+              <Input label="Teléfono Móvil / WhatsApp" type="tel" required autoComplete="tel" inputMode="numeric" pattern="3[0-9]{9}" title="Ingresa 10 dígitos; debe comenzar por 3." maxLength={10} value={phone} onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))} error={phone.length > 0 && !/^3\d{9}$/.test(phone) ? "Ingresa 10 dígitos; debe comenzar por 3." : undefined} />
             </>
           )}
-          <Input label="Correo Electrónico" type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-          <Input label="Contraseña" type="password" required autoComplete={isRegister ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} error={isRegister && password.length > 0 && password.length < 8 ? "Mínimo 8 caracteres." : undefined} />
+          <Input label="Correo Electrónico" type="email" required autoComplete="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} />
+          <Input label="Contraseña" type="password" required minLength={isRegister ? 8 : undefined} autoComplete={isRegister ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} error={isRegister && password.length > 0 && password.length < 8 ? "Mínimo 8 caracteres." : undefined} />
           {isRegister && (
             <>
               <Input label="Confirmar Contraseña" type="password" required autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} error={confirmPassword.length > 0 && password !== confirmPassword ? "Las contraseñas no coinciden." : undefined} />

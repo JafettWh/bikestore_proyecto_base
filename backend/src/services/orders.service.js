@@ -1,12 +1,16 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
 const AppError = require('../utils/AppError');
+const { validateFullName, validatePhone, validateDeliveryAddress } = require('../utils/customer-data');
 
 function validateCheckout(data) {
-    const required = ['name', 'email', 'phone', 'address', 'city', 'department'];
-    const missing = required.filter((field) => typeof data[field] !== 'string' || !data[field].trim());
-    if (missing.length) throw new AppError(`Completa los datos de envío: ${missing.join(', ')}`, 400);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) throw new AppError('El correo de envío no es válido', 400);
+    const name = validateFullName(data.name);
+    const email = typeof data.email === 'string' ? data.email.trim().toLowerCase() : '';
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new AppError('El correo de envío no es válido', 400);
+    }
+    const phone = validatePhone(data.phone, true);
+    const deliveryAddress = validateDeliveryAddress(data, { required: true, strictCity: true });
     if (!['card', 'pse'].includes(data.paymentMethod)) throw new AppError('Selecciona un método de pago válido', 400);
     if (data.paymentMethod === 'card') {
         const digits = String(data.cardNumber || '');
@@ -39,6 +43,7 @@ function validateCheckout(data) {
     } else if (typeof data.bankName !== 'string' || !data.bankName.trim()) {
         throw new AppError('Selecciona el banco para continuar con el pago simulado', 400);
     }
+    return { name, email, phone, ...deliveryAddress };
 }
 
 function orderNumber() {
@@ -47,7 +52,7 @@ function orderNumber() {
 }
 
 async function createOrder(userId, data) {
-    validateCheckout(data);
+    const checkout = validateCheckout(data);
     if (!Array.isArray(data.items) || !data.items.length || data.items.length > 100) {
         throw new AppError('El carrito está vacío o contiene demasiados productos', 400);
     }
@@ -130,13 +135,13 @@ async function createOrder(userId, data) {
                 subtotal,
                 shipping,
                 total,
-                data.name.trim(),
-                data.email.trim().toLowerCase(),
-                data.phone.trim(),
-                data.address.trim(),
-                data.neighborhood?.trim() || null,
-                data.city.trim(),
-                data.department.trim(),
+                checkout.name,
+                checkout.email,
+                checkout.phone,
+                checkout.address,
+                checkout.neighborhood || null,
+                checkout.city,
+                checkout.department,
                 data.paymentMethod
             ]
         );

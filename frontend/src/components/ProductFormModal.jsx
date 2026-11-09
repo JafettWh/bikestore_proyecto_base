@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Icon from "./Icon";
 import Button from "./Button";
 import Input from "./Input";
 import { useAuth } from "../hooks/useAuth";
 import { apiRequest } from "../utils/api";
+import { asset } from "../config/env";
 import "../assets/styles.css";
 
 const categoriesBySection = {
@@ -26,9 +27,11 @@ export const ProductFormModal = ({
   const [image, setImage] = useState("");
   const [gallery, setGallery] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
+  const [filePreviews, setFilePreviews] = useState([]);
   const [availableImages, setAvailableImages] = useState([]);
+  const [imagesLoadError, setImagesLoadError] = useState("");
   const [sizes, setSizes] = useState("");
-  const [badge, setBadge] = useState("");
+  const [etiqueta, setEtiqueta] = useState("");
   const [description, setDescription] = useState("");
   // Especificaciones técnicas del producto
   const [technicalSpecs, setTechnicalSpecs] = useState("");
@@ -40,10 +43,16 @@ export const ProductFormModal = ({
     let active = true;
     apiRequest("/products/images", { token })
       .then(({ data }) => {
-        if (active) setAvailableImages(data);
+        if (active) {
+          setAvailableImages(data);
+          setImagesLoadError("");
+        }
       })
       .catch(() => {
-        if (active) setAvailableImages([]);
+        if (active) {
+          setAvailableImages([]);
+          setImagesLoadError("No se pudieron cargar las imágenes guardadas. Aún puedes subir archivos nuevos.");
+        }
       });
     return () => { active = false; };
   }, [isOpen, token]);
@@ -59,7 +68,7 @@ export const ProductFormModal = ({
       setGallery(Array.isArray(productToEdit.gallery) ? productToEdit.gallery : []);
       setImageFiles([]);
       setSizes(Array.isArray(productToEdit.sizes) ? productToEdit.sizes.join(", ") : "");
-      setBadge(productToEdit.badge || "");
+      setEtiqueta(productToEdit.etiqueta || "");
       setDescription(productToEdit.description || "");
 
       // Cargar especificaciones técnicas existentes (CU-11)
@@ -84,13 +93,26 @@ export const ProductFormModal = ({
       setGallery([]);
       setImageFiles([]);
       setSizes("");
-      setBadge("");
+      setEtiqueta("");
       setDescription("");
       // Limpiar para registro nuevo (CU-09)
       setTechnicalSpecs("");
     }
     setError("");
   }, [productToEdit, isOpen]);
+
+  const fileInputRef = useRef(null);
+  useEffect(() => {
+    const previews = imageFiles.map((file) => ({ name: file.name, url: URL.createObjectURL(file) }));
+    setFilePreviews(previews);
+    return () => previews.forEach(({ url }) => URL.revokeObjectURL(url));
+  }, [imageFiles]);
+
+  const imageOptions = [...new Map([
+    ...availableImages,
+    ...(productToEdit?.image ? [{ url: productToEdit.image, name: productToEdit.image.split("/").pop() }] : []),
+    ...(productToEdit?.gallery || []).map((url) => ({ url, name: url.split("/").pop() })),
+  ].map((option) => [option.url, option])).values()];
 
   if (!isOpen) return null;
 
@@ -136,10 +158,10 @@ export const ProductFormModal = ({
         gallery: [...new Set([
           ...gallery,
           ...(productToEdit?.image && productToEdit.image !== image ? [productToEdit.image] : []),
-        ])],
+        ])].filter((url) => url !== image),
         imageFiles,
         sizes: productSizes,
-        badge: badge.trim() || undefined,
+        etiqueta: etiqueta.trim() || undefined,
         description: description.trim(),
         technicalSpecs: technicalSpecs.trim() || undefined,
         specs: technicalSpecs.trim() || productToEdit?.specs,
@@ -240,8 +262,8 @@ export const ProductFormModal = ({
             <Input
               label="Etiqueta"
               placeholder="Ej. Nuevo, Oferta..."
-              value={badge}
-              onChange={(e) => setBadge(e.target.value)}
+              value={etiqueta}
+              onChange={(e) => setEtiqueta(e.target.value)}
             />
           </div>
 
@@ -253,29 +275,74 @@ export const ProductFormModal = ({
           />
 
           <div className="product-form-modal-div-6">
-            <label className="product-form-modal-label-1">
-              Imagen de Muestra
+            <label className="product-form-modal-label-1" htmlFor="product-main-image">
+              Imagen principal del producto
             </label>
-            <select value={image} onChange={(e) => setImage(e.target.value)} className="product-form-modal-select-1">
-              <option value="">Selecciona una imagen</option>
-              {[...new Map([
-                ...availableImages,
-                ...(productToEdit?.image ? [{ url: productToEdit.image, name: productToEdit.image.split("/").pop() }] : []),
-                ...(productToEdit?.gallery || []).map((url) => ({ url, name: url.split("/").pop() })),
-              ].map((option) => [option.url, option])).values()].map((option) => (
+            <select id="product-main-image" value={image} onChange={(e) => {
+              setImage(e.target.value);
+              setGallery((selected) => selected.filter((url) => url !== e.target.value));
+            }} className="product-form-modal-select-1">
+              <option value="">Selecciona una imagen guardada</option>
+              {imageOptions.map((option) => (
                 <option key={option.url} value={option.url}>{option.name}</option>
               ))}
             </select>
-            <label className="product-form-modal-label-1" htmlFor="product-gallery">Imágenes adicionales guardadas</label>
-            <select id="product-gallery" multiple size={4} value={gallery} onChange={(event) => setGallery(Array.from(event.target.selectedOptions, (option) => option.value))} className="product-form-modal-select-1">
-              {availableImages.map((option) => <option key={option.url} value={option.url}>{option.name}</option>)}
-              {(productToEdit?.gallery || []).filter((url) => !availableImages.some((option) => option.url === url)).map((url) => <option key={url} value={url}>{url.split("/").pop()}</option>)}
-            </select>
-            <label className="product-form-modal-label-1" htmlFor="product-image-file">O carga una imagen JPG, PNG o WEBP (máximo 20 MB)</label>
-            <input id="product-image-file" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => {
+
+            {(image || filePreviews.length > 0) && (
+              <div className="product-form-image-preview">
+                <img
+                  src={image ? asset(image) : filePreviews[0].url}
+                  alt="Vista previa de la imagen principal"
+                />
+                <div>
+                  <strong>Vista previa de imagen principal</strong>
+                  <span>{image || `${filePreviews[0]?.name} (se usará como principal al guardar)`}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="product-form-gallery">
+              <div className="product-form-gallery-heading">
+                <label className="product-form-modal-label-1">
+                  Galería adicional guardada
+                </label>
+                <span>{gallery.filter((url) => url !== image).length} seleccionada(s)</span>
+              </div>
+              {imagesLoadError && <p className="product-form-image-notice" role="status">{imagesLoadError}</p>}
+              {imageOptions.length ? (
+                <div className="product-form-image-grid">
+                  {imageOptions.map((option) => (
+                    <label className="product-form-image-option" key={option.url}>
+                      <input
+                        type="checkbox"
+                        checked={gallery.includes(option.url) && option.url !== image}
+                        disabled={option.url === image}
+                        onChange={(event) => setGallery((selected) => (
+                          event.target.checked
+                            ? [...new Set([...selected, option.url])]
+                            : selected.filter((url) => url !== option.url)
+                        ))}
+                      />
+                      <img src={asset(option.url)} alt="" />
+                      <span>{option.name}{option.url === image ? " · Principal" : ""}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="product-form-image-notice">No hay imágenes guardadas disponibles. Puedes subir archivos nuevos.</p>
+              )}
+              <p className="product-form-image-notice">
+                Las imágenes guardadas se reutilizan desde <code>frontend/public/assets/products</code> o <code>backend/uploads</code>. Al guardar, la ruta principal queda vinculada al producto y las adicionales a su galería en la base de datos.
+              </p>
+            </div>
+
+            <label className="product-form-modal-label-1" htmlFor="product-image-file">
+              Subir imágenes nuevas (JPG, PNG o WEBP; hasta 10 archivos de 20 MB cada uno)
+            </label>
+            <input ref={fileInputRef} id="product-image-file" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => {
               const files = Array.from(event.target.files || []);
-              if (files.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 20 * 1024 * 1024)) {
-                setError("Selecciona imágenes JPG, PNG o WEBP de máximo 20 MB cada una.");
+              if (files.length > 10 || files.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 20 * 1024 * 1024)) {
+                setError("Selecciona hasta 10 imágenes JPG, PNG o WEBP de máximo 20 MB cada una.");
                 setImageFiles([]);
                 event.target.value = "";
                 return;
@@ -283,7 +350,32 @@ export const ProductFormModal = ({
               setImageFiles(files);
               setError("");
             }} />
-            {imageFiles.length > 0 && <span className="product-form-modal-label-1">{imageFiles.length} imagen(es) nueva(s) seleccionada(s)</span>}
+            {filePreviews.length > 0 && (
+              <>
+                <p className="product-form-image-notice">
+                  {image ? "Los archivos nuevos se agregarán como imágenes adicionales." : "El primer archivo será la imagen principal; los demás se agregarán a la galería."}
+                  {" "}Al guardar, los archivos se almacenan en <code>backend/uploads</code> y sus rutas quedan vinculadas al producto.
+                </p>
+                <div className="product-form-image-grid">
+                  {filePreviews.map((preview, index) => (
+                    <div className="product-form-image-option product-form-image-upload" key={`${preview.name}-${index}`}>
+                      <img src={preview.url} alt={`Vista previa de ${preview.name}`} />
+                      <span>{preview.name}{!image && index === 0 ? " · Principal al guardar" : " · Nueva"}</span>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="product-form-clear-images"
+                  onClick={() => {
+                    setImageFiles([]);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                >
+                  Quitar archivos seleccionados
+                </button>
+              </>
+            )}
           </div>
 
           <div className="product-form-modal-div-9">

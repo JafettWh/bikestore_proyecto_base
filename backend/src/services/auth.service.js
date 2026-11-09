@@ -6,6 +6,7 @@ const pool = require('../config/db');
 const env = require('../config/env');
 const { createToken } = require('../utils/jwt');
 const AppError = require('../utils/AppError');
+const { validateFullName, validatePhone, validateDeliveryAddress } = require('../utils/customer-data');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const publicUser = (row) => ({
@@ -44,13 +45,15 @@ async function findUserByEmail(email) {
 }
 
 async function registerUser({ name, nombre, email, password, phone, acceptedTerms }) {
-    const userName = (name || nombre || '').trim();
+    const userName = validateFullName(name || nombre);
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    if (!userName || !normalizedEmail || !password || !phone?.trim()) {
+    if (!normalizedEmail || typeof password !== 'string' || !password || typeof phone !== 'string' || !phone.trim()) {
         throw new AppError('Nombre, correo, teléfono y contraseña son obligatorios', 400);
     }
+    if (normalizedEmail.length > 254) throw new AppError('El correo no puede superar 254 caracteres', 400);
     validateEmail(normalizedEmail);
     if (password.length < 8) throw new AppError('La contraseña debe tener mínimo 8 caracteres', 400);
+    const normalizedPhone = validatePhone(phone, true);
     if (acceptedTerms !== true) throw new AppError('Debes aceptar los términos y condiciones', 400);
 
     const existing = await findUserByEmail(normalizedEmail);
@@ -61,7 +64,7 @@ async function registerUser({ name, nombre, email, password, phone, acceptedTerm
         const [result] = await pool.execute(
             `INSERT INTO usuario (id_rol, nombre_usuario, correo_usuario, contraseña_hash, telefono_usuario, terms_accepted_at)
              SELECT id_rol, ?, ?, ?, ?, CURRENT_TIMESTAMP FROM rol WHERE nombre_rol = 'cliente'`,
-            [userName, normalizedEmail, hash, phone.trim()]
+            [userName, normalizedEmail, hash, normalizedPhone]
         );
         return { id: result.insertId };
     } catch (error) {
@@ -87,11 +90,13 @@ async function loginUser({ email, password }) {
 }
 
 async function updateOwnProfile(userId, data) {
-    const name = typeof data.name === 'string' ? data.name.trim() : '';
+    const name = validateFullName(data.name);
     const email = typeof data.email === 'string' ? data.email.trim().toLowerCase() : '';
-    const phone = typeof data.phone === 'string' ? data.phone.trim() : '';
     if (!name || !email) throw new AppError('El nombre y el correo son obligatorios', 400);
+    if (email.length > 254) throw new AppError('El correo no puede superar 254 caracteres', 400);
     validateEmail(email);
+    const phone = validatePhone(data.phone);
+    const deliveryAddress = validateDeliveryAddress(data);
 
     try {
         const [result] = await pool.execute(
@@ -103,10 +108,10 @@ async function updateOwnProfile(userId, data) {
                 name,
                 email,
                 phone || null,
-                data.address?.trim() || null,
-                data.neighborhood?.trim() || null,
-                data.city?.trim() || null,
-                data.department?.trim() || null,
+                deliveryAddress.address || null,
+                deliveryAddress.neighborhood || null,
+                deliveryAddress.city || null,
+                deliveryAddress.department || null,
                 userId
             ]
         );

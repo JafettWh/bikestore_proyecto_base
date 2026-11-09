@@ -29,7 +29,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
 @layer utilities {
   /* components/Button.jsx */
   .button-base {
-    @apply inline-flex items-center justify-center font-extrabold uppercase tracking-wider transition-all duration-200 cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-md font-extrabold uppercase tracking-wider transition-all duration-200 cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .button-size-sm {
     @apply h-9 px-3.5 text-[10px] gap-1.5;
@@ -306,13 +306,25 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply relative w-full h-[640px] sm:h-[700px] bg-[#181915] text-white overflow-hidden flex items-center;
   }
   .hero-banner-img-1 {
-    @apply absolute inset-0 w-full h-full object-cover object-center scale-100;
+    @apply absolute inset-0 w-full h-full object-cover object-center scale-100 opacity-0 transition-opacity duration-1000;
+  }
+  .hero-banner-img-1.is-active {
+    @apply opacity-100;
   }
   .hero-banner-div-1 {
     @apply absolute inset-0 bg-gradient-to-r from-[#080907]/95 via-[#080907]/75 to-transparent sm:w-3/4;
   }
   .hero-banner-div-2 {
     @apply absolute inset-0 bg-gradient-to-t from-[#080907] via-transparent to-black/30;
+  }
+  .hero-banner-arrow {
+    @apply absolute top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/50 bg-black/45 text-white transition-colors hover:border-[#ffd400] hover:bg-black/75 hover:text-[#ffd400] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffd400];
+  }
+  .hero-banner-arrow-previous {
+    @apply left-4 sm:left-8;
+  }
+  .hero-banner-arrow-next {
+    @apply right-4 sm:right-8;
   }
   .hero-banner-div-3 {
     @apply relative z-10 max-w-[1400px] mx-auto px-6 sm:px-10 w-full text-left py-12;
@@ -346,6 +358,15 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
   }
   .hero-banner-div-8 {
     @apply bg-[#0f100d]/90 backdrop-blur-md border-t-2 border-[#ffd400] px-6 py-4;
+  }
+  .hero-banner-div-9 {
+    @apply absolute bottom-8 left-6 sm:left-10 z-10 flex items-center gap-2;
+  }
+  .hero-banner-button-2 {
+    @apply h-2.5 w-2.5 rounded-full border border-white/80 bg-white/40 p-0 transition-colors;
+  }
+  .hero-banner-button-2.is-active {
+    @apply bg-[#ffd400] border-[#ffd400];
   }
   .hero-banner-span-4 {
     @apply font-['Barlow_Condensed'] text-2xl font-bold text-white block;
@@ -544,6 +565,51 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
   }
   .product-form-modal-div-9 {
     @apply grid grid-cols-1 sm:grid-cols-2 gap-3;
+  }
+  .product-form-gallery {
+    @apply flex flex-col gap-2;
+  }
+  .product-form-gallery-heading {
+    @apply flex items-center justify-between gap-3;
+  }
+  .product-form-gallery-heading > span {
+    @apply text-[10px] text-[#6d6f69];
+  }
+  .product-form-image-grid {
+    @apply grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto p-1;
+  }
+  .product-form-image-option {
+    @apply min-w-0 flex flex-col gap-1 border border-[#dedfd9] bg-[#f8f8f6] p-2 text-left text-[10px] normal-case tracking-normal;
+  }
+  .product-form-image-option input[type="checkbox"] {
+    @apply h-4 w-4 accent-[#ffd400];
+  }
+  .product-form-image-option img {
+    @apply h-20 w-full object-cover bg-white;
+  }
+  .product-form-image-option span {
+    @apply break-all text-[#454640];
+  }
+  .product-form-image-upload {
+    @apply border-dashed border-[#b8b9b2];
+  }
+  .product-form-image-preview {
+    @apply flex items-center gap-3 border border-[#dedfd9] bg-[#f8f8f6] p-2;
+  }
+  .product-form-image-preview img {
+    @apply h-20 w-24 shrink-0 object-cover bg-white;
+  }
+  .product-form-image-preview div {
+    @apply flex min-w-0 flex-col gap-1 text-[11px];
+  }
+  .product-form-image-preview span {
+    @apply break-all text-[#6d6f69];
+  }
+  .product-form-image-notice {
+    @apply m-0 text-[11px] leading-relaxed text-[#6d6f69];
+  }
+  .product-form-clear-images {
+    @apply w-fit border-0 bg-transparent p-1 text-[10px] font-bold uppercase text-[#6d6f69] underline;
   }
 
   /* components/SearchModal.jsx */
@@ -1449,7 +1515,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply grid grid-cols-2 gap-3 mb-5;
   }
   .checkout-button-1 {
-    @apply h-12 text-xs font-bold uppercase tracking-wider border rounded-sm transition-all cursor-pointer flex items-center justify-center gap-2;
+    @apply h-12 text-xs font-bold uppercase tracking-wider border rounded-md transition-all cursor-pointer flex items-center justify-center gap-2;
   }
   .checkout-button-2 {
     @apply border-[#11120f] bg-[#11120f] text-white shadow-sm;
@@ -1935,6 +2001,21 @@ aside,
   border-radius: 5px;
 }
 
+.admin-dashboard-aside-1 {
+  border-radius: 0 !important;
+}
+
+.product-form-modal-form-1 .product-form-image-option {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.product-form-modal-form-1 .product-form-image-option input[type="checkbox"] {
+  align-self: flex-start;
+}
+
 .product-card {
   border-radius: 5px;
   overflow: hidden;
@@ -1982,6 +2063,16 @@ aside,
   background: #fff5f5;
   color: #8d2929;
   font-size: 13px;
+}
+
+button:not([class*="rounded-full"]) {
+  border-radius: 5px;
+}
+
+button:not([class*="rounded-full"]).hero-banner-button-2,
+button:not([class*="rounded-full"]).hero-banner-arrow,
+button:not([class*="rounded-full"]).header-button-7 {
+  border-radius: 9999px;
 }
 
 .api-state {

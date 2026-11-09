@@ -5,57 +5,8 @@ import Icon from "../components/Icon";
 import Button from "../components/Button";
 import Input from "../components/Input";
 import Badge from "../components/Badge";
+import { colombiaLocations } from "../utils/colombiaLocations";
 import "../assets/styles.css";
-
-// Departamentos y Ciudades de Colombia para selección dinámica
-const departamentosColombia = {
-  "Valle del Cauca": [
-    "Palmira",
-    "Cali",
-    "Buga",
-    "Tuluá",
-    "Yumbo",
-    "Jamundí",
-    "Cartago",
-    "Buenaventura",
-  ],
-  Antioquia: [
-    "Medellín",
-    "Envigado",
-    "Rionegro",
-    "Itagüí",
-    "Bello",
-    "Sabaneta",
-    "La Ceja",
-  ],
-  "Bogotá D.C.": [
-    "Bogotá D.C. (Usaquén)",
-    "Bogotá D.C. (Chapinero)",
-    "Bogotá D.C. (Suba)",
-    "Bogotá D.C. (Teusaquillo)",
-    "Bogotá D.C. (Fontibón)",
-  ],
-  Cundinamarca: [
-    "Chía",
-    "Cota",
-    "Soacha",
-    "Facatativá",
-    "Zipaquirá",
-    "Fusagasugá",
-  ],
-  Santander: [
-    "Bucaramanga",
-    "Floridablanca",
-    "Girón",
-    "Piedecuesta",
-    "Barrancabermeja",
-  ],
-  Atlántico: ["Barranquilla", "Soledad", "Malambo", "Puerto Colombia"],
-  Risaralda: ["Pereira", "Dosquebradas", "Santa Rosa de Cabal"],
-  Caldas: ["Manizales", "Villamaría", "Chinchiná"],
-  Quindío: ["Armenia", "Calarcá", "Circasia", "Montenegro"],
-  Bolívar: ["Cartagena", "Turbaco", "Magangué"],
-};
 
 export const PerfilPage = ({ onNavigate, orders = [] }) => {
   const { currentUser, updateProfile } = useAuth();
@@ -79,7 +30,7 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
     if (currentUser) {
       setName(currentUser.name || "");
       setEmail(currentUser.email || "");
-      setPhone(currentUser.phone || "");
+      setPhone((currentUser.phone || "").replace(/\D/g, "").slice(0, 10));
       setDepartment(currentUser.department || "");
       setCity(currentUser.city || "");
       setAddress(currentUser.address || "");
@@ -98,7 +49,7 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
     if (currentUser) {
       setName(currentUser.name || "");
       setEmail(currentUser.email || "");
-      setPhone(currentUser.phone || "");
+      setPhone((currentUser.phone || "").replace(/\D/g, "").slice(0, 10));
       setDepartment(currentUser.department || "");
       setCity(currentUser.city || "");
       setAddress(currentUser.address || "");
@@ -119,6 +70,34 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
     }
     if (!email.trim()) {
       setErrorMessage("El correo electrónico es un campo obligatorio.");
+      return;
+    }
+    if (!/^[\p{L}\p{M}][\p{L}\p{M} .'-]{2,119}$/u.test(name.trim())) {
+      setErrorMessage("Ingresa un nombre de 3 a 120 caracteres, usando letras y espacios.");
+      return;
+    }
+    if (phone && !/^3\d{9}$/.test(phone)) {
+      setErrorMessage("El teléfono móvil debe comenzar por 3 y tener 10 dígitos.");
+      return;
+    }
+    if ((department && !city) || (!department && city)) {
+      setErrorMessage("Selecciona tanto el departamento como la ciudad o municipio.");
+      return;
+    }
+    if (address && (address.trim().length < 5 || address.trim().length > 255)) {
+      setErrorMessage("La dirección debe tener entre 5 y 255 caracteres.");
+      return;
+    }
+    if (address && !/^[\p{L}\p{M}\p{N}\s#.,\-/'º°]+$/u.test(address.trim())) {
+      setErrorMessage("La dirección contiene caracteres no permitidos.");
+      return;
+    }
+    if (neighborhood.trim().length > 120) {
+      setErrorMessage("El barrio o las indicaciones no pueden superar 120 caracteres.");
+      return;
+    }
+    if (neighborhood.trim() && !/^[\p{L}\p{M}\p{N}\s#.,\-/'º°]+$/u.test(neighborhood.trim())) {
+      setErrorMessage("El barrio o las indicaciones contienen caracteres no permitidos.");
       return;
     }
 
@@ -257,6 +236,10 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
                   placeholder="Tu nombre completo"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  minLength={3}
+                  maxLength={120}
+                  pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ .'-]{3,120}"
+                  title="Usa letras, espacios, apóstrofes, puntos o guiones (3 a 120 caracteres)."
                   disabled={!isEditing}
                 />
               </div>
@@ -269,6 +252,7 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
                   placeholder="tu@correo.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  maxLength={254}
                   disabled={!isEditing}
                 />
               </div>
@@ -276,9 +260,13 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
               <div>
                 <Input
                   label="Teléfono Móvil / WhatsApp"
-                  placeholder="Teléfono móvil"
+                  placeholder="3001234567"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  inputMode="numeric"
+                  maxLength={10}
+                  pattern="3[0-9]{9}"
+                  title="Ingresa un número móvil colombiano de 10 dígitos que comience por 3."
                   disabled={!isEditing}
                   icon={<Icon name="phone" size={16} />}
                 />
@@ -299,15 +287,16 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
 
             <div className="perfil-fields-grid">
               <div className="perfil-field-group">
-                <label className="perfil-field-label">Departamento *</label>
+                <label className="perfil-field-label" htmlFor="perfil-department">Departamento</label>
                 <select
+                  id="perfil-department"
                   value={department}
                   onChange={(e) => handleDepartmentChange(e.target.value)}
                   disabled={!isEditing}
                   className="perfil-select"
                 >
                   <option value="">Selecciona un departamento</option>
-                  {Object.keys(departamentosColombia).map((dep) => (
+                  {Object.keys(colombiaLocations).map((dep) => (
                     <option key={dep} value={dep}>
                       {dep}
                     </option>
@@ -316,15 +305,19 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
               </div>
 
               <div className="perfil-field-group">
-                <label className="perfil-field-label">Ciudad / Municipio *</label>
+                <label className="perfil-field-label" htmlFor="perfil-city">Ciudad / Municipio</label>
                 <select
+                  id="perfil-city"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   disabled={!isEditing}
                   className="perfil-select"
                 >
                   <option value="">Selecciona una ciudad</option>
-                  {(departamentosColombia[department] || []).map(
+                  {!(colombiaLocations[department] || []).includes(city) && city && (
+                    <option key={`saved-${city}`} value={city}>{city} (guardada en el perfil)</option>
+                  )}
+                  {(colombiaLocations[department] || []).map(
                     (c) => (
                       <option key={c} value={c}>
                         {c}
@@ -340,6 +333,10 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
                   placeholder="Ej. Calle 15 #28-40, Barrio San Pedro"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
+                  minLength={5}
+                  maxLength={255}
+                  pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 #.,/º°'-]{5,255}"
+                  title="Usa una dirección de 5 a 255 caracteres con letras, números y separadores comunes."
                   disabled={!isEditing}
                 />
               </div>
@@ -350,6 +347,9 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
                   placeholder="Ej. Apto 402, Torre B, frente al parque"
                   value={neighborhood}
                   onChange={(e) => setNeighborhood(e.target.value)}
+                  maxLength={120}
+                  pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 #.,/º°'-]{0,120}"
+                  title="Usa hasta 120 caracteres con letras, números y separadores comunes."
                   disabled={!isEditing}
                 />
               </div>

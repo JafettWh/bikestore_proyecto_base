@@ -479,8 +479,8 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                           <b className="admin-dashboard-b-1">
                             {p.name}
                           </b>
-                          {p.badge && (<span className="admin-dashboard-span-11">
-                              {p.badge}
+                          {p.etiqueta && (<span className="admin-dashboard-span-11">
+                              {p.etiqueta}
                             </span>)}
                         </div>
                       </td>

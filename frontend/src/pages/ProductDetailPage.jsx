@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { formatCOP } from "../utils/formatters";
 import Breadcrumb from "../components/Breadcrumb";
 import Badge from "../components/Badge";
@@ -7,11 +7,14 @@ import Icon from "../components/Icon";
 import { asset } from "../config/env";
 import "../assets/styles.css";
 export const ProductDetailPage = ({ product, onAddToCart, onNavigate, }) => {
-    const [selectedPhoto, setSelectedPhoto] = useState(product.gallery && product.gallery.length > 0 ? product.gallery[0] : product.image);
+    const [selectedPhoto, setSelectedPhoto] = useState(product.image);
     const [selectedSize, setSelectedSize] = useState(product.sizes ? product.sizes[0] : undefined);
     const [quantity, setQuantity] = useState(1);
     const isOutOfStock = product.stock <= 0;
-    const photos = product.gallery && product.gallery.length > 0 ? product.gallery : [product.image];
+    const photos = [...new Set([product.image, ...(product.gallery || [])].filter(Boolean))];
+    useEffect(() => {
+        setSelectedPhoto(product.image);
+    }, [product.id, product.image]);
     const handleAddToCart = () => {
         if (isOutOfStock)
             return;
@@ -37,9 +40,9 @@ export const ProductDetailPage = ({ product, onAddToCart, onNavigate, }) => {
         {/* Columna Izquierda: Galería */}
         <div className="product-detail-div-1">
           <div className="product-detail-div-2">
-            {product.badge && (<div className="product-detail-div-3">
+            {product.etiqueta && (<div className="product-detail-div-3">
                 <Badge variant={isOutOfStock ? "red" : "yellow"}>
-                  {isOutOfStock ? "Sin Stock" : product.badge}
+                  {isOutOfStock ? "Sin Stock" : product.etiqueta}
                 </Badge>
               </div>)}
             <img src={asset(selectedPhoto)} alt={product.name} className="product-detail-img-1"/>
