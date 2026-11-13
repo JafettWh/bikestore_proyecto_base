@@ -246,7 +246,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
             <button type="button" onClick={() => setActiveTab("shipments")} className={`admin-dashboard-button-1 ${activeTab === "shipments"
             ? "admin-dashboard-button-2"
             : "admin-dashboard-button-3"}`}>
-              <Icon name="bike" size={17}/> Envíos
+              <Icon name="box" size={17}/> Envíos
             </button>
           </nav>
         </div>
@@ -361,7 +361,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                 : "Ventas mensuales del año"}{" "}
                     (COP)
                   </h3>
-                  <p className="admin-dashboard-p-1">Valor de productos vendidos, sin incluir envío, consultado desde MySQL.</p>
+                  <p className="admin-dashboard-p-1">Valor de productos vendidos, sin incluir envío.</p>
                 </div>
                 
               </div>
