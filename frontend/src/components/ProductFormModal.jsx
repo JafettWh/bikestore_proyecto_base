@@ -253,10 +253,10 @@ export const ProductFormModal = ({
               placeholder="Ej. 3500000"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              helper="Puedes escribir cualquier precio; las flechas cambian $50.000 COP."
+              
             />
             <Input
-              label="Existencias (Stock)"
+              label="Existencias"
               type="number"
               required
               min="0"

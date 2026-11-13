@@ -2507,5 +2507,14 @@ button:not([class*="rounded-full"]).header-button-7 {
 .admin-dashboard-div-1 .input-span-2,
 .admin-dashboard-div-1 .input-span-4,
 .admin-dashboard-div-1 .input-span-5 {
-  font-size: 11px;
+  font-size: 14px;
+}
+
+.admin-dashboard-div-1 table {
+  font-size: 14px;
+}
+
+.admin-dashboard-div-1 label,
+.admin-dashboard-div-1 td button {
+  font-size: 14px;
 }
