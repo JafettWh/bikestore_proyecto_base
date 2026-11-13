@@ -66,7 +66,7 @@ export const SuccessPage = ({ order, onNavigate }) => {
 
       <div className="success-div-7">
         {order && <InvoiceDownload record={order}/>}
-        <Button variant="primary" size="lg" onClick={() => onNavigate("home")} icon={<Icon name="arrow" size={16}/>}>
+        <Button variant="primary" size="lg" onClick={() => { onNavigate("home"); window.location.reload();}} icon={<Icon name="arrow" size={16}/>}>
           Volver a la Tienda
         </Button>
       </div>
