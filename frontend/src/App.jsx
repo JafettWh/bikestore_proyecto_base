@@ -49,14 +49,14 @@ function AppContent() {
     }, [currentUser?.role, token]);
 
     useEffect(() => {
-        if (token && currentUser?.role !== "admin") {
+        if (token && currentUser?.role !== "admin" && currentPage === "profile") {
             apiRequest("/orders/mine", { token })
                 .then(({ data }) => setOrders(data))
                 .catch((error) => showToast(error.message));
-        } else {
+        } else if (!token || currentUser?.role === "admin") {
             setOrders([]);
         }
-    }, [token, currentUser?.role]);
+    }, [token, currentUser?.role, currentPage]);
 
     useEffect(() => {
         if (cartError) showToast(cartError);

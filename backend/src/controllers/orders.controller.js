@@ -17,4 +17,21 @@ async function mine(req, res, next) {
     }
 }
 
-module.exports = { checkout, mine };
+async function listAdminShipments(req, res, next) {
+    try {
+        return res.json({ ok: true, data: await service.listAllOrders() });
+    } catch (error) {
+        return next(error);
+    }
+}
+
+async function updateLogisticsStatus(req, res, next) {
+    try {
+        const order = await service.updateLogisticsStatus(req.params.id, req.body?.status);
+        return res.json({ ok: true, data: order, message: 'Estado del envío actualizado exitosamente' });
+    } catch (error) {
+        return next(error);
+    }
+}
+
+module.exports = { checkout, mine, listAdminShipments, updateLogisticsStatus };

@@ -179,6 +179,7 @@ async function createOrder(userId, data) {
 async function getOrder(id, userId) {
     const [orders] = await pool.execute(
         `SELECT o.id_pedido AS id, o.order_number, o.id_usuario AS user_id, o.estado_pedido AS status,
+            o.estado_logistico AS logistics_status,
             o.subtotal, o.shipping, o.total, o.nombre_destinatario AS recipient_name,
             o.correo_destinatario AS recipient_email, o.telefono_destinatario AS recipient_phone,
             o.dp_direccion_detallada AS address, o.dp_barrio AS neighborhood,
@@ -197,6 +198,7 @@ async function getOrder(id, userId) {
         [id]
     );
     return {
+        internalId: Number(order.id),
         id: order.order_number,
         orderNumber: order.order_number,
         customerName: order.recipient_name,
@@ -219,6 +221,7 @@ async function getOrder(id, userId) {
         total: Number(order.total),
         tax: Math.round(Number(order.subtotal) * 0.19),
         status: order.status === 'paid' ? 'Pagado' : 'Cancelado',
+        logisticsStatus: order.logistics_status,
         createdAt: order.createdAt,
         date: new Date(order.createdAt).toLocaleString('es-CO')
     };
@@ -231,4 +234,49 @@ async function listMyOrders(userId) {
     return orders;
 }
 
-module.exports = { createOrder, getOrder, listMyOrders };
+async function listAllOrders() {
+    const [rows] = await pool.execute(
+        'SELECT id_pedido AS id FROM pedido ORDER BY fecha_pedido DESC'
+    );
+    const orders = [];
+    for (const row of rows) orders.push(await getOrder(row.id, null));
+    return orders;
+}
+
+const LOGISTICS_STATUSES = ['empaquetado', 'en camino', 'entregado', 'retornado'];
+
+async function updateLogisticsStatus(id, status) {
+    const orderId = Number(id);
+    if (!Number.isSafeInteger(orderId) || orderId < 1) {
+        throw new AppError('El identificador del pedido no es válido', 400);
+    }
+    if (!LOGISTICS_STATUSES.includes(status)) {
+        throw new AppError('El estado logístico no es válido', 400);
+    }
+    const [result] = await pool.execute(
+        `UPDATE pedido SET estado_logistico = ?
+         WHERE id_pedido = ? AND estado_pedido = 'paid'`,
+        [status, orderId]
+    );
+    if (!result.affectedRows) {
+        const [rows] = await pool.execute(
+            'SELECT estado_pedido, estado_logistico FROM pedido WHERE id_pedido = ?',
+            [orderId]
+        );
+        if (!rows.length) throw new AppError('Pedido no encontrado', 404);
+        if (rows[0].estado_pedido === 'paid' && rows[0].estado_logistico === status) {
+            return getOrder(orderId, null);
+        }
+        throw new AppError('Solo se puede actualizar el envío de pedidos pagados', 409);
+    }
+    return getOrder(orderId, null);
+}
+
+module.exports = {
+    createOrder,
+    getOrder,
+    listMyOrders,
+    listAllOrders,
+    updateLogisticsStatus,
+    LOGISTICS_STATUSES
+};

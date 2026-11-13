@@ -39,6 +39,10 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
     const [dashboardData, setDashboardData] = useState(null);
     const [dashboardError, setDashboardError] = useState("");
     const [managedProducts, setManagedProducts] = useState(products);
+    const [managedOrders, setManagedOrders] = useState(orders);
+    const [shipmentsLoading, setShipmentsLoading] = useState(false);
+    const [shipmentsError, setShipmentsError] = useState("");
+    const [updatingShipmentId, setUpdatingShipmentId] = useState(null);
     const [managedUsers, setManagedUsers] = useState([]);
     const [userCount, setUserCount] = useState(0);
     const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, month) => ({
@@ -147,6 +151,44 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
             };
     }, [token, userSearch]);
 
+    useEffect(() => {
+      if (activeTab !== "shipments") return undefined;
+      const controller = new AbortController();
+      setShipmentsLoading(true);
+      apiRequest("/admin/envios", { token, signal: controller.signal })
+        .then(({ data }) => {
+          setManagedOrders(data);
+          setShipmentsError("");
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) setShipmentsError(error.message);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setShipmentsLoading(false);
+        });
+      return () => controller.abort();
+    }, [activeTab, token]);
+
+    const handleLogisticsStatusChange = async (order, status) => {
+      setUpdatingShipmentId(order.internalId);
+      setShipmentsError("");
+      try {
+        const { data } = await apiRequest(`/admin/envios/${order.internalId}/estado`, {
+          method: "PUT",
+          token,
+          body: { status },
+        });
+        setManagedOrders((previous) => previous.map((item) => (
+          item.internalId === data.internalId ? data : item
+        )));
+        showNotice(`Envío ${data.orderNumber} actualizado a "${status}".`);
+      } catch (error) {
+        setShipmentsError(error.message);
+      } finally {
+        setUpdatingShipmentId(null);
+      }
+    };
+
     const handleExportReport = async (format) => {
         setIsExporting(true);
         try {
@@ -200,6 +242,12 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
             : "admin-dashboard-button-3"}`}>
               <Icon name="user" size={17}/> Administrar Usuarios
             </button>
+
+            <button type="button" onClick={() => setActiveTab("shipments")} className={`admin-dashboard-button-1 ${activeTab === "shipments"
+            ? "admin-dashboard-button-2"
+            : "admin-dashboard-button-3"}`}>
+              <Icon name="bike" size={17}/> Envíos
+            </button>
           </nav>
         </div>
 
@@ -244,6 +292,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
             "Dashboard de Métricas & Rendimiento"}
               {activeTab === "products" && "Administración de Catálogo"}
               {activeTab === "users" && "Gestión de Usuarios & Seguridad"}
+              {activeTab === "shipments" && "Gestión de Envíos"}
             </h1>
           </div>
 
@@ -639,6 +688,70 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
               </div>
             </div>
           </div>)}
+
+        {activeTab === "shipments" && (
+          <section className="admin-dashboard-shipments">
+            <div className="admin-dashboard-shipments-heading">
+              <div>
+                <h2>Pedidos y estados logísticos</h2>
+                <p>Actualiza el seguimiento del pedido. Los cambios se guardan inmediatamente.</p>
+              </div>
+              <Badge variant="yellow">{managedOrders.length} pedidos</Badge>
+            </div>
+            {shipmentsError && <p className="admin-dashboard-error" role="alert">{shipmentsError}</p>}
+            {shipmentsLoading ? (
+              <p className="admin-dashboard-shipments-empty">Cargando envíos...</p>
+            ) : managedOrders.length ? (
+              <div className="admin-dashboard-div-33">
+                <table className="admin-dashboard-table-1">
+                  <thead>
+                    <tr className="admin-dashboard-tr-1">
+                      <th className="admin-dashboard-th-1">Pedido / Fecha</th>
+                      <th className="admin-dashboard-th-1">Cliente</th>
+                      <th className="admin-dashboard-th-1">Dirección de entrega</th>
+                      <th className="admin-dashboard-th-1">Total</th>
+                      <th className="admin-dashboard-th-2">Estado logístico</th>
+                    </tr>
+                  </thead>
+                  <tbody className="admin-dashboard-tbody-1">
+                    {managedOrders.map((order) => (
+                      <tr key={order.internalId} className="admin-dashboard-tr-2">
+                        <td className="admin-dashboard-td-3">
+                          {order.orderNumber}
+                          <span className="admin-shipment-date">{order.date}</span>
+                        </td>
+                        <td className="admin-dashboard-td-2">
+                          <b>{order.customerName}</b>
+                          <span className="admin-shipment-date">{order.email}</span>
+                        </td>
+                        <td className="admin-dashboard-td-2 admin-shipment-address">
+                          {[order.address, order.neighborhood, order.city].filter(Boolean).join(", ")}
+                        </td>
+                        <td className="admin-dashboard-td-3">{formatCOP(order.total)}</td>
+                        <td className="admin-dashboard-td-2">
+                          <select
+                            className="admin-shipment-status"
+                            value={order.logisticsStatus || "empaquetado"}
+                            disabled={updatingShipmentId === order.internalId}
+                            aria-label={`Estado logístico de ${order.orderNumber}`}
+                            onChange={(event) => handleLogisticsStatusChange(order, event.target.value)}
+                          >
+                            <option value="empaquetado">Empaquetado</option>
+                            <option value="en camino">En camino</option>
+                            <option value="entregado">Entregado</option>
+                            <option value="retornado">Retornado</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="admin-dashboard-shipments-empty">Aún no hay pedidos para gestionar.</p>
+            )}
+          </section>
+        )}
       </main>
 
       {/* MODALES */}

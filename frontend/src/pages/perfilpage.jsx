@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { formatCOP } from "../utils/formatters";
 import Icon from "../components/Icon";
 import Button from "../components/Button";
 import Input from "../components/Input";
 import Badge from "../components/Badge";
+import OrderDetailsModal from "../components/OrderDetailsModal";
 import { colombiaLocations } from "../utils/colombiaLocations";
 import "../assets/styles.css";
 
@@ -15,6 +16,9 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderPage, setOrderPage] = useState(1);
+  const closeOrderModal = useCallback(() => setSelectedOrder(null), []);
 
   // Datos del formulario de perfil
   const [name, setName] = useState("");
@@ -125,11 +129,14 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
   };
 
   // Pedidos del cliente
-  const userOrders = orders.filter(
-    (o) =>
-      o.email?.toLowerCase() === (currentUser?.email || email).toLowerCase() ||
-      o.customerName?.toLowerCase() === (currentUser?.name || name).toLowerCase()
-  );
+  const userOrders = orders;
+  const ordersPerPage = 4;
+  const orderPageCount = Math.max(1, Math.ceil(userOrders.length / ordersPerPage));
+  const visibleOrders = userOrders.slice((orderPage - 1) * ordersPerPage, orderPage * ordersPerPage);
+
+  useEffect(() => {
+    setOrderPage((page) => Math.min(page, Math.max(1, Math.ceil(orders.length / ordersPerPage))));
+  }, [orders.length]);
 
   const initials = (name || "BS")
     .split(" ")
@@ -408,36 +415,60 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
           {/* Tarjeta de Resumen de Pedidos */}
           <div className="perfil-side-card">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="perfil-side-title">Mis Pedidos Recientes</h4>
+              <h4 className="perfil-side-title">Historial de Pedidos</h4>
               <Badge variant="yellow">{userOrders.length}</Badge>
             </div>
 
             {userOrders.length > 0 ? (
-              <div className="space-y-3">
-                {userOrders.slice(0, 3).map((order) => (
-                  <div key={order.id} className="perfil-order-snippet">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs">{order.id}</span>
-                      <Badge variant="green">{order.status}</Badge>
-                    </div>
-                    <p className="text-[11px] text-neutral-500 mt-1">
-                      {order.date || "Fecha reciente"} · {order.items?.length || 1} producto(s)
-                    </p>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-neutral-100">
-                      <span className="text-[10px] uppercase text-neutral-400 font-bold">
-                        Total Pagado:
-                      </span>
-                      <strong className="text-xs text-neutral-900">
-                        {formatCOP(order.total || 0)}
-                      </strong>
-                    </div>
+              <>
+                <div className="perfil-orders-list">
+                  {visibleOrders.map((order) => (
+                    <button
+                      type="button"
+                      key={order.id}
+                      className="perfil-order-snippet"
+                      onClick={() => setSelectedOrder(order)}
+                      aria-label={`Ver detalle del pedido ${order.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs">{order.id}</span>
+                        <Badge variant={order.logisticsStatus === "retornado" ? "red" : "green"}>
+                          {order.logisticsStatus
+                            ? order.logisticsStatus.replace(/^./, (letter) => letter.toUpperCase())
+                            : order.status}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 mt-1">
+                        {order.date || "Fecha reciente"} · {order.items?.length || 1} producto(s)
+                      </p>
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-neutral-100">
+                        <span className="text-[10px] uppercase text-neutral-400 font-bold">
+                          Total Pagado:
+                        </span>
+                        <strong className="text-xs text-neutral-900">
+                          {formatCOP(order.total || 0)}
+                        </strong>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {orderPageCount > 1 && (
+                  <div className="perfil-orders-pagination" aria-label="Paginación del historial de pedidos">
+                    <span>{(orderPage - 1) * ordersPerPage + 1}-{Math.min(orderPage * ordersPerPage, userOrders.length)} de {userOrders.length}</span>
+                    <button type="button" onClick={() => setOrderPage((page) => Math.max(1, page - 1))} disabled={orderPage === 1}>
+                      Anterior
+                    </button>
+                    <span>{orderPage} / {orderPageCount}</span>
+                    <button type="button" onClick={() => setOrderPage((page) => Math.min(orderPageCount, page + 1))} disabled={orderPage === orderPageCount}>
+                      Siguiente
+                    </button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             ) : (
               <div className="perfil-orders-empty">
                 <Icon name="cart" size={24} className="text-neutral-300" />
-                <p>No tienes pedidos activos en este momento.</p>
+                <p>Aún no tienes pedidos en tu historial.</p>
                 <button
                   type="button"
                   onClick={() => onNavigate("home")}
@@ -450,6 +481,7 @@ export const PerfilPage = ({ onNavigate, orders = [] }) => {
           </div>
         </div>
       </div>
+      <OrderDetailsModal order={selectedOrder} onClose={closeOrderModal} />
     </main>
   );
 };

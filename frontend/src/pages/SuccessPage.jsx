@@ -8,6 +8,12 @@ export const SuccessPage = ({ order, onNavigate }) => {
     const orderId = order ? order.id : "BS-20261009-842";
     const email = order ? order.email : "ciclista.premium@gmail.com";
     const total = order ? order.total : 4599000;
+    const logisticsStatus = order?.logisticsStatus || "empaquetado";
+    const returned = logisticsStatus === "retornado";
+    const logisticsSteps = returned
+        ? ["Empaquetado", "En camino", "Retornado"]
+        : ["Empaquetado", "En camino", "Entregado"];
+    const activeStep = returned ? 2 : Math.max(0, ["empaquetado", "en camino", "entregado"].indexOf(logisticsStatus));
     return (<main className="success-main-1">
       {/* Icono de Check */}
       <div className="success-div-1 animate-scale-in">
@@ -38,29 +44,24 @@ export const SuccessPage = ({ order, onNavigate }) => {
         </div>
 
         <div className="success-div-4">
-          <div className="success-div-5">
-            <span className="success-span-4">
-              <Icon name="check" size={16}/>
-            </span>
-            <b className="success-b-1">Empaquetado</b>
-            <span className="success-span-5">En bodega Palmira</span>
-          </div>
-
-          <div className="success-div-6">
-            <span className="success-span-6">
-              2
-            </span>
-            <b className="success-b-1">En Camino</b>
-            <span className="success-span-5">Guía Envía / Servientrega</span>
-          </div>
-
-          <div className="success-div-6">
-            <span className="success-span-6">
-              3
-            </span>
-            <b className="success-b-1">Entregado</b>
-            <span className="success-span-5">En tu dirección</span>
-          </div>
+          {logisticsSteps.map((step, index) => {
+            const complete = index < activeStep;
+            const current = index === activeStep;
+            const active = complete || current;
+            return (
+              <div key={step} className={active ? "success-div-5" : "success-div-6"}>
+                <span className={active ? `success-span-4${returned && current ? " success-returned" : ""}` : "success-span-6"}>
+                  {complete || (current && index === 0)
+                    ? <Icon name="check" size={16}/>
+                    : index + 1}
+                </span>
+                <b className="success-b-1">{step}</b>
+                <span className="success-span-5">
+                  {step === "Empaquetado" ? "En bodega BikeStore" : step === "En camino" ? "En transporte" : returned ? "Entrega no completada" : "En tu dirección"}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
 

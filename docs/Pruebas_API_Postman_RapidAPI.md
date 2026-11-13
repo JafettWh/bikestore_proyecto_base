@@ -28,6 +28,8 @@ Las URLs ya incluyen `http://localhost:3000/api`; no necesitas crear una variabl
 | Inactivar / reactivar producto | `PATCH` | `http://localhost:3000/api/products/{{productId}}/deactivate` / `http://localhost:3000/api/products/{{productId}}/reactivate` | Admin |
 | Crear pedido | `POST` | `http://localhost:3000/api/orders` | Cliente |
 | Ver mis pedidos | `GET` | `http://localhost:3000/api/orders/mine` | Cliente o admin |
+| Listar todos los envíos | `GET` | `http://localhost:3000/api/admin/envios` | Admin |
+| Actualizar estado logístico | `PUT` | `http://localhost:3000/api/admin/envios/{{orderId}}/estado` | Admin |
 | Listar usuarios | `GET` | `http://localhost:3000/api/admin/users?search=cliente&status=Activo` | Admin |
 | Crear usuario | `POST` | `http://localhost:3000/api/admin/users` | Admin |
 | Actualizar usuario | `PUT` | `http://localhost:3000/api/admin/users/{{userId}}` | Admin |
@@ -39,7 +41,7 @@ Para cualquier ruta protegida, usa `Authorization: Bearer {{token}}`. Guarda en 
 
 ## 1. Preparar el entorno
 
-Si ya tenías creada la base de datos antes del cambio de `badge` a `etiqueta`, ejecuta una sola vez `sql/migrations/2026-11-08-rename-badge-to-etiqueta.sql` en MySQL Workbench antes de iniciar la API. Una instalación nueva debe usar el esquema actualizado de `sql/bikestore.sql`.
+Si ya tenías creada la base de datos antes de los cambios recientes, ejecuta una sola vez las migraciones pendientes en orden (`sql/migrations/2026-11-08-rename-badge-to-etiqueta.sql` y `sql/migrations/2026-11-13-add-order-logistics-status.sql`) en MySQL Workbench antes de iniciar la API. Una instalación nueva debe usar el esquema actualizado de `sql/bikestore.sql`.
 
 Desde PowerShell, inicia el backend:
 
@@ -384,6 +386,31 @@ Authorization: Bearer {{token}}
 ```
 
 Un administrador también puede consultar su propio historial con su token; la ruta no lista pedidos de todos los usuarios.
+
+### Administrar envíos (solo administrador)
+
+Lista los pedidos pagados con sus datos de entrega y el estado logístico actual:
+
+```http
+GET http://localhost:3000/api/admin/envios
+Authorization: Bearer {{token}}
+```
+
+Actualiza el estado usando el ID numérico `internalId` devuelto por la lista. Los valores permitidos son `empaquetado`, `en camino`, `entregado` y `retornado`:
+
+```http
+PUT http://localhost:3000/api/admin/envios/{{orderId}}/estado
+Authorization: Bearer {{token}}
+Content-Type: application/json
+```
+
+```json
+{ "status": "en camino" }
+```
+
+El cambio se persiste en `pedido.estado_logistico` y la respuesta incluye el pedido actualizado. Los clientes no pueden consultar esta lista administrativa ni actualizar estados; el historial `GET /api/orders/mine` solo devuelve los pedidos del usuario autenticado. `DELETE` no se implementa para pedidos: el historial de compra se conserva y sus estados logístico y de pago son campos separados.
+
+En el perfil, **Historial de Pedidos** lista todas las compras propias en páginas de cuatro. Al seleccionar un pedido, el modal muestra productos, cantidades, precios, totales, dirección y seguimiento logístico; el estado retornado reemplaza la etapa final de entregado.
 
 ## 8. Usuarios administrados (solo administrador)
 

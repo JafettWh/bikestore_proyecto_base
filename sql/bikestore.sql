@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS pedido (
   order_number VARCHAR(32) NOT NULL UNIQUE,
   id_usuario BIGINT UNSIGNED NOT NULL,
   estado_pedido ENUM('paid', 'cancelled') NOT NULL DEFAULT 'paid',
+  estado_logistico ENUM('empaquetado', 'en camino', 'entregado', 'retornado') NOT NULL DEFAULT 'empaquetado',
   subtotal DECIMAL(12, 2) NOT NULL,
   shipping DECIMAL(12, 2) NOT NULL DEFAULT 0,
   total DECIMAL(12, 2) NOT NULL,

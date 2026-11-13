@@ -7,6 +7,7 @@ const productRoutes = require('./routes/products.routes');
 const userRoutes = require('./routes/users.routes');
 const orderRoutes = require('./routes/orders.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const shipmentRoutes = require('./routes/shipments.routes');
 const errorHandler = require('./middlewares/error.middleware');
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/admin/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
+app.use('/api/admin/envios', shipmentRoutes);
 
 app.use((req, res) => {
     res.status(404).json({ ok: false, message: 'Ruta no encontrada' });
