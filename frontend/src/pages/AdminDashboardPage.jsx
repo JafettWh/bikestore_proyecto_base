@@ -246,7 +246,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
             <button type="button" onClick={() => setActiveTab("shipments")} className={`admin-dashboard-button-1 ${activeTab === "shipments"
             ? "admin-dashboard-button-2"
             : "admin-dashboard-button-3"}`}>
-              <Icon name="box" size={17}/> Envíos
+              <Icon name="box" size={17}/> Gestión de Envíos
             </button>
           </nav>
         </div>

@@ -399,7 +399,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply flex items-center justify-between;
   }
   .metric-card-span-1 {
-    @apply text-[10px] font-bold uppercase tracking-wider text-[#6d6f69];
+    @apply text-[11px] font-bold uppercase tracking-wider text-[#6d6f69];
   }
   .metric-card-span-2 {
     @apply w-8 h-8 rounded-full bg-[#f4f4f0] text-[#11120f] flex items-center justify-center;
@@ -508,7 +508,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply flex flex-col gap-1.5 text-left;
   }
   .product-deactivate-modal-label-1 {
-    @apply text-[10px] font-bold uppercase tracking-wider text-[#11120f];
+    @apply text-[11px] font-bold uppercase tracking-wider text-[#11120f];
   }
   .product-deactivate-modal-textarea-1 {
     @apply w-full p-3 bg-white border border-[#dedfd9] text-xs focus:outline-none focus:border-[#ffd400] resize-none;
@@ -549,7 +549,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply flex flex-col gap-1.5 text-left;
   }
   .product-form-modal-label-1 {
-    @apply text-[10px] font-bold uppercase tracking-wider text-[#11120f];
+    @apply text-[11px] font-bold uppercase tracking-wider text-[#11120f];
   }
   .product-form-modal-select-1 {
     @apply w-full h-12 bg-white border border-[#dedfd9] text-xs px-3 focus:outline-none focus:border-[#ffd400];
@@ -573,13 +573,13 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply flex items-center justify-between gap-3;
   }
   .product-form-gallery-heading > span {
-    @apply text-[10px] text-[#6d6f69];
+    @apply text-[11px] text-[#6d6f69];
   }
   .product-form-image-grid {
     @apply grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto p-1;
   }
   .product-form-image-option {
-    @apply min-w-0 flex flex-col gap-1 border border-[#dedfd9] bg-[#f8f8f6] p-2 text-left text-[10px] normal-case tracking-normal;
+    @apply min-w-0 flex flex-col gap-1 border border-[#dedfd9] bg-[#f8f8f6] p-2 text-left text-[11px] normal-case tracking-normal;
   }
   .product-form-image-option input[type="checkbox"] {
     @apply h-4 w-4 accent-[#ffd400];
@@ -609,7 +609,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply m-0 text-[11px] leading-relaxed text-[#6d6f69];
   }
   .product-form-clear-images {
-    @apply w-fit border-0 bg-transparent p-1 text-[10px] font-bold uppercase text-[#6d6f69] underline;
+    @apply w-fit border-0 bg-transparent p-1 text-[11px] font-bold uppercase text-[#6d6f69] underline;
   }
 
   /* components/SearchModal.jsx */
@@ -726,7 +726,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply flex flex-col gap-1.5 text-left;
   }
   .user-form-modal-label-1 {
-    @apply text-[10px] font-bold uppercase tracking-wider text-[#11120f];
+    @apply text-[11px] font-bold uppercase tracking-wider text-[#11120f];
   }
   .user-form-modal-select-1 {
     @apply w-full h-12 bg-white border border-[#dedfd9] text-xs px-3 focus:outline-none focus:border-[#ffd400];
@@ -936,13 +936,13 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply font-bold block truncate text-white;
   }
   .admin-dashboard-span-4 {
-    @apply text-[10px] text-[#ffd400] font-semibold uppercase tracking-wider block;
+    @apply text-[11px] text-[#ffd400] font-semibold uppercase tracking-wider block;
   }
   .admin-dashboard-button-4 {
-    @apply w-full py-2.5 px-3 text-[10px] font-bold uppercase border border-[#444] text-neutral-300 hover:text-white hover:border-white rounded-sm transition-colors bg-transparent cursor-pointer flex items-center justify-center gap-2;
+    @apply w-full py-2.5 px-3 text-[11px] font-bold uppercase border border-[#444] text-neutral-300 hover:text-white hover:border-white rounded-sm transition-colors bg-transparent cursor-pointer flex items-center justify-center gap-2;
   }
   .admin-dashboard-button-5 {
-    @apply w-full py-2.5 px-3 text-[10px] font-bold uppercase bg-red-950/40 border border-red-700/60 text-red-300 hover:bg-red-900/60 hover:text-white rounded-sm transition-colors cursor-pointer flex items-center justify-center gap-2;
+    @apply w-full py-2.5 px-3 text-[11px] font-bold uppercase bg-red-950/40 border border-red-700/60 text-red-300 hover:bg-red-900/60 hover:text-white rounded-sm transition-colors cursor-pointer flex items-center justify-center gap-2;
   }
   .admin-dashboard-main-1 {
     @apply flex-1 p-6 sm:p-10 overflow-x-auto;
@@ -951,7 +951,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8 border-b border-[#dedfd9];
   }
   .admin-dashboard-span-5 {
-    @apply text-[10px] font-extrabold uppercase tracking-widest text-[#777a71] block;
+    @apply text-[11px] font-extrabold uppercase tracking-widest text-[#777a71] block;
   }
   .admin-dashboard-h1-1 {
     @apply font-['Barlow_Condensed'] font-extrabold uppercase text-4xl sm:text-5xl text-[#11120f] tracking-tight;
@@ -999,7 +999,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 p-4 bg-[#f4f4f0] border border-[#dedfd9] mb-5;
   }
   .admin-dashboard-label-1 {
-    @apply flex flex-col gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#11120f];
+    @apply flex flex-col gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#11120f];
   }
   .admin-dashboard-select-1 {
     @apply h-10 bg-white border border-[#dedfd9] text-xs px-3 focus:outline-none focus:border-[#ffd400];
@@ -1035,10 +1035,10 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply w-24 shrink-0 flex;
   }
   .admin-dashboard-span-7 {
-    @apply text-[9px] font-extrabold uppercase tracking-wider text-[#6d6f69] [writing-mode:vertical-rl] rotate-180 text-center py-5;
+    @apply text-[11px] font-extrabold uppercase tracking-wider text-[#6d6f69] [writing-mode:vertical-rl] rotate-180 text-center py-5;
   }
   .admin-dashboard-div-25 {
-    @apply h-56 flex-1 flex flex-col justify-between items-end pr-2 pb-7 pt-2 text-[9px] font-bold text-[#6d6f69];
+    @apply h-56 flex-1 flex flex-col justify-between items-end pr-2 pb-7 pt-2 text-[11px] font-bold text-[#6d6f69];
   }
   .admin-dashboard-div-26 {
     @apply flex-1;
@@ -1050,19 +1050,19 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply min-w-5 flex-1 flex flex-col items-center gap-2;
   }
   .admin-dashboard-span-8 {
-    @apply text-[9px] font-bold text-[#11120f] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap;
+    @apply text-[11px] font-bold text-[#11120f] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap;
   }
   .admin-dashboard-div-29 {
     @apply w-full min-h-1 bg-[#11120f] group-hover:bg-[#ffd400] transition-all rounded-t-sm border-t-4 border-[#ffd400];
   }
   .admin-dashboard-span-9 {
-    @apply text-[10px] font-bold text-[#6d6f69] uppercase;
+    @apply text-[11px] font-bold text-[#6d6f69] uppercase;
   }
   .admin-dashboard-p-2 {
-    @apply text-center text-[9px] font-extrabold uppercase tracking-wider text-[#6d6f69] mt-2 mb-0;
+    @apply text-center text-[11px] font-extrabold uppercase tracking-wider text-[#6d6f69] mt-2 mb-0;
   }
   .admin-dashboard-p-3 {
-    @apply text-[10px] text-[#6d6f69] text-center mb-0;
+    @apply text-[11px] text-[#6d6f69] text-center mb-0;
   }
   .admin-dashboard-div-30 {
     @apply bg-white border border-[#dedfd9] rounded-sm overflow-hidden shadow-sm;
@@ -2456,7 +2456,7 @@ button:not([class*="rounded-full"]).header-button-7 {
   display: block;
   margin-top: 5px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
 }
 
@@ -2500,4 +2500,13 @@ button:not([class*="rounded-full"]).header-button-7 {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+.admin-dashboard-div-1 .button-size-sm,
+.admin-dashboard-div-1 .badge-span-1,
+.admin-dashboard-div-1 .input-label-1,
+.admin-dashboard-div-1 .input-span-2,
+.admin-dashboard-div-1 .input-span-4,
+.admin-dashboard-div-1 .input-span-5 {
+  font-size: 11px;
 }

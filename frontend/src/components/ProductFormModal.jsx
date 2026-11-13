@@ -12,6 +12,7 @@ const categoriesBySection = {
   Componentes: ["Transmisión", "Bielas", "Ruedas", "Asiento", "Manubrio", "Cassette"],
   Accesorios: ["Iluminación", "Protección", "Hidratación", "Tecnología", "Herramientas", "Sensores"],
 };
+const PRICE_STEP = 50000;
 
 export const ProductFormModal = ({
   isOpen,
@@ -245,10 +246,14 @@ export const ProductFormModal = ({
               label="Precio en COP ($)"
               type="number"
               required
-              min="1"
+              min={price
+                ? ((Number(price) % PRICE_STEP) + PRICE_STEP) % PRICE_STEP
+                : 0}
+              step={PRICE_STEP}
               placeholder="Ej. 3500000"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
+              helper="Puedes escribir cualquier precio; las flechas cambian $50.000 COP."
             />
             <Input
               label="Existencias (Stock)"
