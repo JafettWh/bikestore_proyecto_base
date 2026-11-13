@@ -363,7 +363,7 @@ export const AdminDashboardPage = ({ products = [], orders = [], onNavigate, onS
                   </h3>
                   <p className="admin-dashboard-p-1">Valor de productos vendidos, sin incluir envío, consultado desde MySQL.</p>
                 </div>
-                <Badge variant="yellow">Datos de MySQL</Badge>
+                
               </div>
 
               <div className="admin-dashboard-div-16">
