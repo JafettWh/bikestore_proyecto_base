@@ -1062,8 +1062,7 @@ footer{background:#141512;color:#a2a39e;padding:65px max(24px,calc((100vw - 1400
     @apply text-center text-[11px] font-extrabold uppercase tracking-wider text-[#6d6f69] mt-2 mb-0;
   }
   .admin-dashboard-p-3 {
-    @apply text-[11px] text-[#6d6f69] text-center mb-0;
-  }
+    @apply text-[11px] text-[#6d6f69] text-center mb-0;  }
   .admin-dashboard-div-30 {
     @apply bg-white border border-[#dedfd9] rounded-sm overflow-hidden shadow-sm;
   }
